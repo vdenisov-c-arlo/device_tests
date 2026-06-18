@@ -9,20 +9,21 @@ Usage:
 """
 
 import argparse
-import configparser
 import os
 import socket
 import struct
 import sys
 import time
 
-_ini = configparser.ConfigParser()
-_ini.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'serial_mux.ini'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from console_utils import get_serial_mux_config
+
+_cfg = get_serial_mux_config()
 
 SLAVE_ADDR = 0xFF
 DO_REGISTER = 1  # MBHR_DISCRETE_OUTPUTS_LOW
-MODBUS_TCP_PORT = _ini.getint('voodoo', 'modbus_port', fallback=502)
-DEFAULT_HOST = _ini.get('voodoo', 'host', fallback='192.168.100.1')
+MODBUS_TCP_PORT = _cfg['voodoo_port']
+DEFAULT_HOST = _cfg['voodoo_host']
 DEFAULT_DURATION = 2.0
 
 

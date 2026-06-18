@@ -19,9 +19,7 @@ Usage:
   python3 livestream_cycle_test.py [--cycles 20] [--stream-duration 15]
 """
 
-import socket
 import time
-import threading
 import sys
 import os
 import json
@@ -29,6 +27,7 @@ import argparse
 import uuid
 import ssl
 from datetime import datetime
+from enum import Enum, auto
 
 try:
     import websockets.sync.client as ws_sync
@@ -39,16 +38,11 @@ except ImportError:
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import get_serial_mux_config, isp_init_console
+from console_utils import DeviceTestBase, isp_init_console
 from mcu_patterns import is_crash_dump_line, save_crash_dump
 
 sys.stdout.reconfigure(line_buffering=True)
 
-_cfg = get_serial_mux_config()
-MCU_HOST = _cfg['mcu_host']
-MCU_PORT = _cfg['mcu_port']
-ISP_HOST = _cfg['isp_host']
-ISP_PORT = _cfg['isp_port']
 LOG_DIR = "/tmp/livestream_cycle_logs"
 
 SLEEP_INDICATOR = "Network Stack Suspended, MCU can enter DeepSleep power mode"
@@ -58,7 +52,6 @@ MEDIASERVER_OK = "mediasrvr_open_video_stream ok"
 MEDIASERVER_FAIL = "unable to open video stream in MediaServer"
 SPROP_OK = "sprop-parameter-set="
 INGRESS_WORKER = "_media_ingress_worker()"
-THREAD_REGISTER = "register_thread() video_ingress_worker"
 THREAD_UNREGISTER = "unregister_thread() video_ingress_worker"
 
 CRASH_PATTERNS = [
@@ -72,7 +65,8 @@ GOLDENDEV_PASSWORD = "UmVwelJlcHozNDcy"
 GOLDENDEV_SITE = "https://mygoldendev.arlo.com"
 AUTH_API = "https://myapigdev-web.arlo.com"
 HMSWEB_API = "https://myapigoldendev.arlo.com"
-LIVESTREAM_WSS = "wss://livestream-z2-goldendev.arlo.com:7443/"
+
+RESET_DO_CHANNEL = 2
 
 SDP_OFFER_TEMPLATE = (
     "v=0\r\n"
@@ -164,7 +158,6 @@ SDP_OFFER_TEMPLATE = (
 
 
 def generate_sdp_offer():
-    """Generate a unique but valid SDP offer for each stream session."""
     import hashlib
     import random
 
@@ -188,92 +181,13 @@ def generate_sdp_offer():
     )
 
 
-class ConsoleReader(threading.Thread):
-    """Continuously reads from serial_mux TCP socket, stores lines."""
-
-    def __init__(self, name, host, port, log_file, init_func=None):
-        super().__init__(daemon=True)
-        self.name_tag = name
-        self.host = host
-        self.port = port
-        self.log_file = log_file
-        self.init_func = init_func
-        self.lines = []
-        self.lock = threading.Lock()
-        self.events = []
-        self.connected = False
-
-    def run(self):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((self.host, self.port))
-            sock.settimeout(1.0)
-            self.connected = True
-            self._sock = sock
-            self._initialized = False
-            self._init_pending = False
-            buf = b""
-            with open(self.log_file, "a") as f:
-                while True:
-                    try:
-                        data = sock.recv(4096)
-                        if not data:
-                            break
-                        buf += data
-                        if self.init_func and b"login:" in data:
-                            time.sleep(1)
-                            self.init_func(sock)
-                            self._initialized = True
-                            self._init_pending = False
-                        while b"\n" in buf:
-                            line, buf = buf.split(b"\n", 1)
-                            text = line.decode("utf-8", errors="replace").strip()
-                            if text:
-                                ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                                entry = f"[{ts}] [{self.name_tag}] {text}"
-                                f.write(entry + "\n")
-                                f.flush()
-                                with self.lock:
-                                    self.lines.append(text)
-                                    self._check_events(text)
-                    except socket.timeout:
-                        if self._init_pending and self.init_func and not self._initialized:
-                            self._init_pending = False
-                            time.sleep(1)
-                            self.init_func(sock)
-                            self._initialized = True
-                        continue
-        except Exception as e:
-            print(f"  [{self.name_tag}] Connection failed: {e}")
-
-    def reinit(self):
-        """Request re-initialization from the reader thread."""
-        self._initialized = False
-        self._init_pending = True
-
-    def _check_events(self, text):
-        if SLEEP_INDICATOR in text:
-            self.events.append(("sleep", time.time(), text))
-        elif MEDIASERVER_OPEN in text or STREAM_ACTIVE in text:
-            self.events.append(("ms_open", time.time(), text))
-        elif MEDIASERVER_OK in text or SPROP_OK in text or INGRESS_WORKER in text:
-            self.events.append(("ms_ok", time.time(), text))
-        elif MEDIASERVER_FAIL in text:
-            self.events.append(("ms_fail", time.time(), text))
-        elif "video_ingress_worker" in text and "unregister_thread" in text:
-            self.events.append(("ingress_exit", time.time(), text))
-        elif is_crash_dump_line(text):
-            self.events.append(("crash", time.time(), text))
-        elif any(p in text for p in CRASH_PATTERNS):
-            self.events.append(("crash", time.time(), text))
-
-    def get_events_since(self, since_time):
-        with self.lock:
-            return [(ev, t, txt) for ev, t, txt in self.events if t > since_time]
-
-    def clear_events(self):
-        with self.lock:
-            self.events.clear()
+class Event(Enum):
+    SLEEP_DETECTED = auto()
+    MS_OPEN = auto()
+    MS_OK = auto()
+    MS_FAIL = auto()
+    INGRESS_EXIT = auto()
+    CRASH_DETECTED = auto()
 
 
 class ArloStreamAPI:
@@ -375,28 +289,20 @@ class ArloStreamAPI:
         print(f"  API connected: device={result['deviceName']}, model={self.model_id}, parent={self.parent_id}")
 
     def start_stream(self):
-        """Full livestream start: notify device + SDP signaling.
-
-        Returns True if the signaling completed (device should open MediaServer).
-        """
-        # Step 1: Send startUserStream notify to wake device
         print(f"    [1/4] Sending startUserStream notify...")
         notify_ok = self._send_start_notify()
         if not notify_ok:
             return False
 
-        # Step 2: Wait for device to boot (ISP cold boot takes ~7s)
         print(f"    [2/4] Waiting 10s for device to boot...")
         time.sleep(10)
 
-        # Step 3: Get SIP info for signaling
         print(f"    [3/4] Fetching sipInfo...")
         sip_info = self._get_sip_info()
         if not sip_info:
             return False
         self._sip_info = sip_info
 
-        # Step 4: Open WebSocket and send SDP offer
         print(f"    [4/4] Sending SDP offer via WebSocket...")
         return self._send_sdp_offer(sip_info)
 
@@ -472,7 +378,7 @@ class ArloStreamAPI:
     def _send_sdp_offer(self, sip_data):
         sip_info = sip_data["sipCallInfo"]
         domain = sip_info["domain"]
-        port = 7443  # Always 7443 for WebSocket (sipInfo port 443 is for SIP URI)
+        port = 7443
         wss_url = f"wss://{domain}:{port}/"
 
         sdp_offer = generate_sdp_offer()
@@ -524,7 +430,6 @@ class ArloStreamAPI:
             )
             self._ws.send(http_msg)
 
-            # Wait for SDP answer (200 OK)
             response = self._ws.recv(timeout=20)
             if "200 OK" in response:
                 print(f"      Got 200 OK with SDP answer ({len(response)} bytes)")
@@ -537,7 +442,6 @@ class ArloStreamAPI:
             return False
 
     def stop_stream(self):
-        """Send sessionDisconnected to end the stream."""
         if not self._ws or not self._sip_info:
             return False
 
@@ -585,7 +489,6 @@ class ArloStreamAPI:
         self._ws = None
         self._sip_info = None
 
-        # Also send idle notify via API
         self.page.evaluate("""async ([hmsApi, token, parentId, xCloudId, deviceId]) => {
             function txId() {
                 return 'FE!' + ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
@@ -623,240 +526,226 @@ class ArloStreamAPI:
             self.pw.stop()
 
 
-def wait_for_event(reader, event_type, timeout, since):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        events = reader.get_events_since(since)
-        for ev, t, txt in events:
-            if ev == event_type:
-                return (ev, t, txt)
-        time.sleep(0.5)
-    return None
+class LivestreamCycleTest(DeviceTestBase):
+    _test_name = "livestream_cycle"
+    _log_dir = LOG_DIR
+    _sleep_timeout = 90
 
+    def __init__(self, device_id, stream_duration, sleep_timeout, output_dir=None):
+        super().__init__()
+        self.device_id = device_id
+        self.stream_duration = stream_duration
+        self._sleep_timeout = sleep_timeout
+        self.output_dir = output_dir or os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "crash_dumps")
+        self.api = None
+        self.hung_detected = False
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, "voodoo_do_pulse.py")
+    def _check_events(self, line, source):
+        if source == "MCU":
+            if SLEEP_INDICATOR in line:
+                self.event_callback(Event.SLEEP_DETECTED, source, line)
 
+        if MEDIASERVER_OPEN in line or STREAM_ACTIVE in line:
+            self.event_callback(Event.MS_OPEN, source, line)
+        elif MEDIASERVER_OK in line or SPROP_OK in line or INGRESS_WORKER in line:
+            self.event_callback(Event.MS_OK, source, line)
+        elif MEDIASERVER_FAIL in line:
+            self.event_callback(Event.MS_FAIL, source, line)
+        elif "video_ingress_worker" in line and "unregister_thread" in line:
+            self.event_callback(Event.INGRESS_EXIT, source, line)
+        elif is_crash_dump_line(line):
+            self.event_callback(Event.CRASH_DETECTED, source, line)
+        elif any(p in line for p in CRASH_PATTERNS):
+            self.event_callback(Event.CRASH_DETECTED, source, line)
 
-def voodoo(voodoo_args):
-    import subprocess
-    cmd = [sys.executable, VOODOO_SCRIPT] + voodoo_args
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    return result.returncode == 0
+    def _handle_crash(self, cycle):
+        """Save crash dump, reset device."""
+        time.sleep(3)
+        lines = []
+        if self.isp:
+            lines += self.isp.get_lines()
+        if self.mcu:
+            lines += self.mcu.get_lines()
 
+        dump_path = save_crash_dump(lines, self.output_dir, "livestream", cycle, source="isp")
+        if dump_path:
+            print(f"  [DUMP] Crash dump saved: {os.path.basename(dump_path)}")
+        else:
+            os.makedirs(self.output_dir, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fallback = os.path.join(self.output_dir, f"crash_livestream_cycle{cycle}_{ts}.log")
+            with open(fallback, "w") as f:
+                f.write(f"# Crash context — livestream cycle {cycle}\n")
+                f.write(f"# Time: {datetime.now().isoformat()}\n\n")
+                for l in lines[-30:]:
+                    f.write(l + "\n")
+            print(f"  [DUMP] Context saved: {os.path.basename(fallback)}")
 
-def reset_device_livestream(isp_reader, mcu_reader):
-    """Hardware-reset the DUT via voodoo board reset button and wait for boot."""
-    print(f"  [{datetime.now().strftime('%H:%M:%S')}] [RESET] Pressing reset button...")
-    voodoo(["2", "1"])
-    print(f"  [{datetime.now().strftime('%H:%M:%S')}] [RESET] Waiting 60s for device to boot...")
-    isp_reader.clear_events()
-    mcu_reader.clear_events()
-    time.sleep(60)
+        print(f"  [RESET] Pressing reset button...")
+        self.press_button(RESET_DO_CHANNEL, 1.0)
+        print(f"  [RESET] Waiting 60s for device to boot...")
+        self.clear_events()
+        time.sleep(60)
 
+    def run_cycle(self, cycle_num):
+        print(f"\n--- Cycle {cycle_num} ---")
+        self.clear_events()
+        self.mcu.start_recording()
+        self.isp.start_recording()
 
-def handle_crash_livestream(isp_reader, mcu_reader, cycle, output_dir):
-    """Save crash dump from livestream test, reset device, continue."""
-    time.sleep(3)
-    lines = []
-    with isp_reader.lock:
-        lines += list(getattr(isp_reader, '_raw_lines', []))[-30:]
-    with mcu_reader.lock:
-        lines += list(getattr(mcu_reader, '_raw_lines', []))[-30:]
-
-    # Collect from events
-    crash_events = [(t, txt) for ev, t, txt in isp_reader.events + mcu_reader.events
-                    if ev == "crash"]
-    for _, txt in crash_events:
-        if txt not in lines:
-            lines.append(txt)
-
-    dump_path = save_crash_dump(lines, output_dir, "livestream", cycle, source="isp")
-    if dump_path:
-        print(f"  [DUMP] Crash dump saved: {os.path.basename(dump_path)}")
-    else:
-        os.makedirs(output_dir, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fallback = os.path.join(output_dir, f"crash_livestream_cycle{cycle}_{ts}.log")
-        with open(fallback, "w") as f:
-            f.write(f"# Crash context — livestream cycle {cycle}\n")
-            f.write(f"# Time: {datetime.now().isoformat()}\n\n")
-            for l in lines[-30:]:
-                f.write(l + "\n")
-        dump_path = fallback
-        print(f"  [DUMP] Context saved: {os.path.basename(fallback)}")
-
-    reset_device_livestream(isp_reader, mcu_reader)
-    return dump_path
-
-
-def run_test(args):
-    os.makedirs(LOG_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(LOG_DIR, f"stream_cycle_{timestamp}.log")
-
-    print(f"=== Livestream Cycle Stress Test ===")
-    print(f"  Device: {args.device_id}")
-    print(f"  Cycles: {args.cycles}")
-    print(f"  Stream duration: {args.stream_duration}s")
-    print(f"  Sleep timeout: {args.sleep_timeout}s")
-    print(f"  Log: {log_file}")
-    print()
-
-    # Start console readers
-    isp_reader = ConsoleReader("ISP", ISP_HOST, ISP_PORT, log_file, init_func=isp_init_console)
-    mcu_reader = ConsoleReader("MCU", MCU_HOST, MCU_PORT, log_file)
-    isp_reader.start()
-    mcu_reader.start()
-    time.sleep(1)
-    if not isp_reader.connected:
-        print("  WARNING: ISP console not connected (serial_mux?)")
-    if not mcu_reader.connected:
-        print("  WARNING: MCU console not connected (serial_mux?)")
-
-    # Connect API
-    api = ArloStreamAPI(args.device_id)
-    try:
-        api.connect()
-    except Exception as e:
-        print(f"  FATAL: API connection failed: {e}")
-        sys.exit(1)
-
-    results = []
-    hung_detected = False
-
-    for cycle in range(1, args.cycles + 1):
-        print(f"\n--- Cycle {cycle}/{args.cycles} ---")
-        cycle_start = time.time()
-        isp_reader.clear_events()
-        mcu_reader.clear_events()
-
-        # Step 1: Start livestream (full signaling)
+        # Start livestream
         print(f"  [{datetime.now().strftime('%H:%M:%S')}] Starting livestream...")
-        if not api.start_stream():
+        if not self.api.start_stream():
             print(f"  WARN: Stream start failed at signaling level")
-            results.append(("signaling_fail", cycle))
+            self.mcu.stop_recording()
+            self.isp.stop_recording()
             time.sleep(10)
-            continue
+            return True  # signaling failure is not a device bug
 
-        # Step 2: Wait for MediaServer Open
+        # Wait for MediaServer Open
         print(f"  Waiting for MediaServer Open (timeout 30s)...")
-        ms_event = wait_for_event(isp_reader, "ms_open", 30, cycle_start)
+        ms_event = self.wait_for_event(Event.MS_OPEN, timeout=30)
         if ms_event is None:
             print(f"  WARN: No MediaServer Open within 30s")
-            results.append(("no_ms_open", cycle))
-            api.stop_stream()
+            self.api.stop_stream()
+            self.mcu.stop_recording()
+            self.isp.stop_recording()
             time.sleep(10)
-            continue
+            return True  # no open is not a hang
 
-        open_time = ms_event[1]
         print(f"  [{datetime.now().strftime('%H:%M:%S')}] MediaServer Open logged")
 
-        # Step 3: Check outcome (success / fail / hang)
-        outcome = None
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            events = isp_reader.get_events_since(open_time - 0.1)
-            for ev, t, txt in events:
-                if ev == "ms_ok":
-                    outcome = "ok"
-                    break
-                elif ev == "ms_fail":
-                    outcome = "fail"
-                    break
-                elif ev == "crash":
-                    outcome = "crash"
-                    break
-            if outcome:
-                break
-            time.sleep(0.5)
+        # Check outcome
+        outcome_event = self.wait_for_any_event(
+            [Event.MS_OK, Event.MS_FAIL, Event.CRASH_DETECTED], timeout=20)
 
-        if outcome == "ok":
+        if outcome_event and outcome_event[0] == Event.MS_OK:
             print(f"  [{datetime.now().strftime('%H:%M:%S')}] Stream opened OK")
-            print(f"  Streaming for {args.stream_duration}s...")
-            time.sleep(args.stream_duration)
-        elif outcome == "fail":
+            print(f"  Streaming for {self.stream_duration}s...")
+            time.sleep(self.stream_duration)
+        elif outcome_event and outcome_event[0] == Event.MS_FAIL:
             print(f"  [{datetime.now().strftime('%H:%M:%S')}] *** MediaServer OPEN FAILED (recoverable)")
-            results.append(("open_failed", cycle))
-        elif outcome == "crash":
-            print(f"  [{datetime.now().strftime('%H:%M:%S')}] !!! CRASH DETECTED (unrelated)")
-            results.append(("crash", cycle))
-            api.stop_stream()
-            dump_dir = getattr(args, 'output_dir', None) or os.path.join(SCRIPT_DIR, "crash_dumps")
-            handle_crash_livestream(isp_reader, mcu_reader, cycle, dump_dir)
-            continue
+        elif outcome_event and outcome_event[0] == Event.CRASH_DETECTED:
+            print(f"  [{datetime.now().strftime('%H:%M:%S')}] !!! CRASH DETECTED")
+            self.api.stop_stream()
+            self._handle_crash(cycle_num)
+            self.mcu.stop_recording()
+            self.isp.stop_recording()
+            return True  # crash is unrelated, device reset
         else:
             # No response in 20s — THIS IS THE HANG
             print(f"  [{datetime.now().strftime('%H:%M:%S')}] *** HANG DETECTED — MediaServer never responded!")
             print(f"  video_ingress_worker stuck in msgrcv()")
-            results.append(("HUNG", cycle))
-            hung_detected = True
 
             print(f"  Confirming hang (60s observation)...")
             time.sleep(60)
-            exit_events = isp_reader.get_events_since(open_time)
-            ingress_exited = any(ev == "ingress_exit" for ev, _, _ in exit_events)
-            if not ingress_exited:
+            exit_event = self.check_event(Event.INGRESS_EXIT)
+            if not exit_event:
                 print(f"  CONFIRMED: video_ingress_worker still stuck after 60s")
                 print(f"  Device will NOT sleep until reboot.")
+                self.hung_detected = True
+                self.api.stop_stream()
+                self.mcu.stop_recording()
+                self.isp.stop_recording()
+                return False
             else:
                 print(f"  False alarm: video_ingress_worker eventually exited (slow open)")
-                results[-1] = ("slow_open", cycle)
-                hung_detected = False
 
-            if hung_detected:
-                print(f"\n  === BUG REPRODUCED at cycle {cycle} ===")
-                print(f"  Log saved: {log_file}")
-                break
-
-        # Step 4: Stop livestream
+        # Stop livestream
         print(f"  [{datetime.now().strftime('%H:%M:%S')}] Stopping livestream...")
-        api.stop_stream()
+        self.api.stop_stream()
 
-        # Step 5: Wait for sleep
-        print(f"  Waiting for sleep (timeout {args.sleep_timeout}s)...")
-        stop_time = time.time()
-        sleep_event = wait_for_event(mcu_reader, "sleep", args.sleep_timeout, stop_time)
+        # Wait for sleep
+        print(f"  Waiting for sleep (timeout {self._sleep_timeout}s)...")
+        sleep_event = self.wait_for_event(Event.SLEEP_DETECTED, timeout=self._sleep_timeout)
+        self.mcu.stop_recording()
+        self.isp.stop_recording()
+
         if sleep_event:
-            sleep_latency = sleep_event[1] - stop_time
-            print(f"  [{datetime.now().strftime('%H:%M:%S')}] Device sleeping (took {sleep_latency:.1f}s)")
-            results.append(("ok", cycle))
+            print(f"  [{datetime.now().strftime('%H:%M:%S')}] Device sleeping")
             time.sleep(3)
+            return True
         else:
-            print(f"  [{datetime.now().strftime('%H:%M:%S')}] *** Device did NOT sleep within {args.sleep_timeout}s!")
-            events_after_stop = isp_reader.get_events_since(stop_time)
-            has_ingress_exit = any(ev == "ingress_exit" for ev, _, _ in events_after_stop)
-            if not has_ingress_exit and ms_event:
+            print(f"  [{datetime.now().strftime('%H:%M:%S')}] *** Device did NOT sleep within {self._sleep_timeout}s!")
+            exit_event = self.check_event(Event.INGRESS_EXIT)
+            if not exit_event:
                 print(f"  Likely hung: video_ingress_worker never unregistered")
-                results.append(("HUNG_NO_SLEEP", cycle))
-                hung_detected = True
-                print(f"\n  === BUG REPRODUCED (sleep failure) at cycle {cycle} ===")
-                print(f"  Log saved: {log_file}")
-                break
-            else:
-                results.append(("no_sleep_other", cycle))
-                time.sleep(10)
+                self.hung_detected = True
+                return False
+            time.sleep(10)
+            return True  # no-sleep for other reason
 
-    # Summary
-    print(f"\n{'='*60}")
-    print(f"=== TEST COMPLETE ===")
-    print(f"  Total cycles: {len(results)}")
-    ok_count = sum(1 for r, _ in results if r == 'ok')
-    hung_count = sum(1 for r, _ in results if r in ('HUNG', 'HUNG_NO_SLEEP'))
-    print(f"  Successful streams: {ok_count}")
-    print(f"  Open failed (recoverable): {sum(1 for r, _ in results if r == 'open_failed')}")
-    print(f"  HUNG (msgrcv blocked): {hung_count}")
-    print(f"  Crashes: {sum(1 for r, _ in results if r == 'crash')}")
-    print(f"  No MediaServer Open: {sum(1 for r, _ in results if r == 'no_ms_open')}")
-    print(f"  Signaling failures: {sum(1 for r, _ in results if r == 'signaling_fail')}")
-    print(f"  No sleep (other): {sum(1 for r, _ in results if r == 'no_sleep_other')}")
-    print(f"  Log file: {log_file}")
-    if hung_detected:
-        print(f"\n  *** BUG REPRODUCED — MediaServer hang confirmed ***")
-    print(f"{'='*60}")
+    def recovery(self, cycle):
+        print(f"\n  [RECOVERY] Resetting device...")
+        self.press_button(RESET_DO_CHANNEL, 1.0)
+        time.sleep(3)
+        self.reconnect_consoles()
+        self.clear_events()
+        print(f"  [RECOVERY] Waiting 60s for boot...")
+        time.sleep(60)
+        if self.isp and self.isp.sock:
+            isp_init_console(self.isp.sock)
+        return True
 
-    api.close()
-    return 1 if hung_detected else 0
+    def run(self, num_cycles=1):
+        os.makedirs(self._log_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        print(f"=== Livestream Cycle Stress Test ===")
+        print(f"  Device: {self.device_id}")
+        print(f"  Cycles: {num_cycles}")
+        print(f"  Stream duration: {self.stream_duration}s")
+        print(f"  Sleep timeout: {self._sleep_timeout}s")
+        print()
+
+        # Connect consoles
+        print("[INIT] Connecting consoles...")
+        self.connect_consoles()
+        time.sleep(1)
+
+        # Init ISP console
+        if self.isp and self.isp.sock:
+            isp_init_console(self.isp.sock)
+
+        # Connect API
+        self.api = ArloStreamAPI(self.device_id)
+        try:
+            self.api.connect()
+        except Exception as e:
+            print(f"  FATAL: API connection failed: {e}")
+            self.disconnect_consoles()
+            return 1
+
+        # Run cycles
+        for cycle in range(1, num_cycles + 1):
+            passed = self.run_cycle(cycle)
+            self.results.append(passed)
+
+            if not passed:
+                if self.hung_detected:
+                    print(f"\n  === BUG REPRODUCED at cycle {cycle} ===")
+                    break
+                if not self.recovery(cycle):
+                    print("  [RECOVERY] Aborting remaining cycles")
+                    break
+
+        self.api.close()
+        self.disconnect_consoles()
+
+        # Summary
+        total = len(self.results)
+        ok_count = sum(self.results)
+        print(f"\n{'='*60}")
+        print(f"=== TEST COMPLETE ===")
+        print(f"  Total cycles: {total}")
+        print(f"  Successful: {ok_count}")
+        print(f"  Failed: {total - ok_count}")
+        if self.hung_detected:
+            print(f"\n  *** BUG REPRODUCED — MediaServer hang confirmed ***")
+        print(f"{'='*60}")
+
+        return 1 if self.hung_detected else 0
 
 
 def main():
@@ -873,7 +762,13 @@ def main():
                         help="Directory for crash dump files (default: ./crash_dumps)")
     args = parser.parse_args()
 
-    sys.exit(run_test(args))
+    test = LivestreamCycleTest(
+        device_id=args.device_id,
+        stream_duration=args.stream_duration,
+        sleep_timeout=args.sleep_timeout,
+        output_dir=args.output_dir,
+    )
+    sys.exit(test.run(num_cycles=args.cycles))
 
 
 if __name__ == "__main__":
