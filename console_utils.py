@@ -10,7 +10,10 @@ import socket
 import time
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_INI_PATH = os.path.join(_SCRIPT_DIR, 'serial_mux', 'serial_mux.ini')
+_INI_PATH = os.environ.get(
+    'SERIAL_MUX_INI',
+    os.path.join(_SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini'),
+)
 
 
 def get_serial_mux_config():
