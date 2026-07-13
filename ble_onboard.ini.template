@@ -1,0 +1,47 @@
+[arlo_cloud]
+# Arlo account credentials (goldendev environment)
+email = voodoojah@gmail.com
+password = UmVwelJlcHozNDcy
+
+# Cloud API endpoints
+environment = goldendev
+auth_api = https://myapigdev-web.arlo.com
+hmsweb_api = https://myapigoldendev.arlo.com
+site_url = https://mygoldendev.arlo.com
+
+[wifi]
+ssid = YOUR_WIFI_SSID
+psk = YOUR_WIFI_PASSWORD
+# band: 0=auto, 1=2.4GHz, 2=5GHz
+band = 0
+# security: 0=auto, 2=WPA2, 3=WPA3, 11=WPA2/WPA3 mixed
+security = 0
+
+[device]
+# BLE advertising name (AVD6001=Lory 2K, AVD5001=Lory FHD)
+ble_name = AVD6001
+# Optional: skip BLE scan, connect directly to this MAC
+# ble_mac = AA:BB:CC:DD:EE:FF
+
+[serial]
+# serial_mux connection for pre-BLE setup (FOTA disable + pubkey extraction)
+host = localhost
+port = 9001
+# Path to serial_mux_client binary
+client_path = /home/denisov/arlo/claude_settings/utils/custom/serial_mux/serial_mux_client
+
+[bluetooth]
+# BT adapter to use (blank = system default, e.g. hci0, hci1)
+adapter =
+
+[options]
+# Skip FOTA URL disable step (if already done)
+skip_fota_disable = false
+# Skip cloud discovery/claiming (WiFi-only test)
+skip_discovery = false
+# Perform WiFi scan before connecting (informational)
+scan_wifi = false
+# Total timeout in seconds for the entire onboarding process
+timeout = 180
+# Verbose BLE logging
+verbose = false
