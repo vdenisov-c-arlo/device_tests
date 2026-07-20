@@ -21,8 +21,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 NUM_CYCLES = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 
-FRONT_BUTTON_DO_CHANNEL = 1
-RESET_DO_CHANNEL = 2
+from voodoo_channels import DO_FRONT as FRONT_BUTTON_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 CRASH_PATTERNS = [
     "segfault", "kernel panic", "coredump", "Assertion failed", "Oops:",

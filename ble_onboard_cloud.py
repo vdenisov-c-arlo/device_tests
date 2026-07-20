@@ -1,5 +1,6 @@
 """BLE Onboarding Cloud — Arlo cloud authentication and device claiming via Playwright."""
 
+import base64
 import time
 import json
 
@@ -73,7 +74,7 @@ class ArloCloudClient:
             const sessResp = await fetch(hmsApi + '/hmsweb/users/session/v3?eventId=' + sid + '&time=' + Date.now(), {
                 headers: {'auth-version': '2', 'Authorization': token,
                           'content-type': 'application/json; charset=utf-8',
-                          'origin': arguments[0], 'x-transaction-id': sid},
+                          'origin': authApi, 'x-transaction-id': sid},
                 credentials: 'include'
             });
             if (sessResp.status !== 200) return {error: 'session failed', status: sessResp.status};
@@ -86,6 +87,116 @@ class ArloCloudClient:
 
         self.token = result["token"]
         print(f"  [CLOUD] Authenticated OK")
+
+    def get_device_cert(self, certificate_id, model_id, device_id):
+        """Fetch device public key from cloud using certificate ID.
+
+        Calls POST /hmsdevicemanagement/users/devices/v2/security/cert/data
+
+        Args:
+            certificate_id: 32-char hex cert ID from BLE characteristic.
+            model_id: Device model (e.g. "AVD6001").
+            device_id: Device serial number.
+
+        Returns:
+            Dict with cert data (contains public key), or None on failure.
+        """
+        result = self.page.evaluate("""async ([hmsApi, token, origin, certId, modelId, deviceId]) => {
+            const resp = await fetch(hmsApi + '/hmsdevicemanagement/users/devices/v2/security/cert/data', {
+                method: 'POST',
+                headers: {'auth-version': '2', 'Authorization': token,
+                          'content-type': 'application/json; charset=utf-8',
+                          'origin': origin},
+                credentials: 'include',
+                body: JSON.stringify({certificateId: certId, modelId: modelId, deviceId: deviceId})
+            });
+            if (resp.status !== 200) return {error: 'cert fetch failed', status: resp.status};
+            const data = await resp.json();
+            return data;
+        }""", [self.hmsweb_api, self.token, self.site_url, certificate_id, model_id, device_id])
+
+        if result.get("error"):
+            print(f"  [CLOUD] Cert fetch failed: {result}")
+            return None
+        return result
+
+    def locate_device(self, discovery_token_hex):
+        """Locate a device using its discovery token.
+
+        Calls GET /hmsweb/locateDevice/v2 with discoveryToken header.
+
+        Args:
+            discovery_token_hex: Hex-encoded discovery token (e.g. "0102030405060708").
+
+        Returns:
+            Dict with device location info (xCloudId, deviceId, etc.), or None.
+        """
+        result = self.page.evaluate("""async ([hmsApi, token, origin, discoveryToken]) => {
+            const resp = await fetch(hmsApi + '/hmsweb/locateDevice/v2', {
+                headers: {'auth-version': '2', 'Authorization': token,
+                          'content-type': 'application/json; charset=utf-8',
+                          'origin': origin, 'discoveryToken': discoveryToken},
+                credentials: 'include'
+            });
+            if (resp.status !== 200) return {error: 'locate failed', status: resp.status, body: (await resp.text()).substring(0, 300)};
+            const data = await resp.json();
+            return data;
+        }""", [self.hmsweb_api, self.token, self.site_url, discovery_token_hex])
+
+        if result.get("error"):
+            print(f"  [CLOUD] Locate device failed: {result}")
+            return None
+        return result
+
+    def claim_device_v2(self, device_id, xcloud_id, discovery_token_hex, model_id):
+        """Claim a device using the v2 claimDevice endpoint.
+
+        Args:
+            device_id: Device serial number.
+            xcloud_id: xCloudId from locateDevice response.
+            discovery_token_hex: Hex discovery token.
+            model_id: Device model + variant (e.g. "AVD6001A").
+
+        Returns:
+            Response dict from claim endpoint.
+        """
+        import time as _time
+        its = str(int(_time.time() * 1000))
+        reg_token_str = (
+            f"role:owner;discoveryToken:{discovery_token_hex};"
+            f"ip:{discovery_token_hex};its:{its};"
+            f"model:{model_id};xcloudId:{xcloud_id};deviceId:{device_id}"
+        )
+        reg_token_hex = reg_token_str.encode().hex()
+
+        result = self.page.evaluate("""async ([hmsApi, token, origin, deviceId, xCloudId, regToken]) => {
+            function txId() {
+                return 'FE!' + ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+            }
+            const tid = txId();
+            const resp = await fetch(hmsApi + '/hmsweb/users/devices/claimDevice', {
+                method: 'POST',
+                headers: {'auth-version': '2', 'Authorization': token,
+                          'content-type': 'application/json; charset=utf-8',
+                          'origin': origin, 'xcloudId': xCloudId,
+                          'registrationToken': regToken,
+                          'x-transaction-id': tid},
+                credentials: 'include',
+                body: JSON.stringify({
+                    transId: tid,
+                    deviceId: deviceId,
+                    xCloudId: xCloudId,
+                    responseUrl: '',
+                    publishResponse: false,
+                    deviceName: 'Lory Doorbell'
+                })
+            });
+            const data = await resp.text();
+            return {status: resp.status, data: data.substring(0, 1000)};
+        }""", [self.hmsweb_api, self.token, self.site_url, device_id, xcloud_id, reg_token_hex])
+
+        return result
 
     def get_devices(self):
         """Get list of devices on the account."""

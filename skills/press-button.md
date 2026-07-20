@@ -11,19 +11,21 @@ When you need to simulate a physical button press on the connected device — to
 
 ## Prerequisites
 
-- Voodoo board reachable at `192.168.100.1` (Modbus TCP, port 502).
+- Voodoo board reachable at `192.168.3.1` (Modbus TCP, port 502).
 - Script: `$ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/voodoo_do_pulse.py`.
 
 ## Button Map
 
-| DO# | Button | Typical Use |
-|-----|--------|-------------|
-| 0 | Sync Button | Wake from deep sleep, start pairing |
-| 1 | Front Button | Doorbell ring, user interaction |
-| 2 | Reset Button | Hardware reset (reboot device) |
-| 3 | Program Mode Button | Enter bootloader / DFU mode |
-| 6 | USB Plug | Simulate USB charger connect/disconnect (set ON=plugged, OFF=unplugged — NOT pulsed) |
-| 7 | PIR | Simulate PIR motion trigger |
+Canonical definitions in `utils/custom/device_tests/voodoo_channels.py`.
+
+| DO# | Constant | Button | Typical Use |
+|-----|----------|--------|-------------|
+| 0 | DO_SYNC | Sync Button | Wake from deep sleep, start pairing |
+| 1 | DO_FRONT | Front Button | Doorbell ring, user interaction |
+| 2 | DO_RESET | Reset Button | Hardware reset (reboot device) |
+| 3 | DO_PROGRAM | Program Mode Button | Enter bootloader / DFU mode |
+| 6 | DO_USB | USB Plug | Simulate USB charger connect/disconnect (set ON=plugged, OFF=unplugged — NOT pulsed) |
+| 7 | DO_PIR | PIR | Simulate PIR motion trigger |
 
 ## Steps
 
@@ -96,8 +98,8 @@ Confirm which button was pressed and for how long. If the script errors (e.g., v
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Connection refused` | Voodoo board not powered or wrong IP | Check power and network to 192.168.100.1 |
-| `timed out` | Network path blocked | Check that host can reach 192.168.100.1 |
+| `Connection refused` | Voodoo board not powered or wrong IP | Check power and network to 192.168.3.1 |
+| `timed out` | Network path blocked | Check that host can reach 192.168.3.1 |
 | `Modbus exception` | Invalid DO register or board firmware issue | Verify board is a voodoo board with DO support |
 
 ## Arguments

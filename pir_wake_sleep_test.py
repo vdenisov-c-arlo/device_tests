@@ -14,8 +14,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 NUM_CYCLES = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 
-PIR_DO_CHANNEL = 7
-RESET_DO_CHANNEL = 2
+from voodoo_channels import DO_PIR as PIR_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 PIR_EVENT_PATTERNS = ["PIR", "pir", "BUTTON", "motion", "wakeup_reason"]
 COREDUMP_PATTERN = "Core dump"
 ALL_CRASH_PATTERNS = CRASH_PATTERNS + HANG_PATTERNS

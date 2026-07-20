@@ -28,13 +28,13 @@ def get_serial_mux_config():
     cfg = configparser.ConfigParser()
     cfg.read(_INI_PATH)
     return {
-        'isp_host': cfg.get('isp', 'tcp_host', fallback='10.9.8.8'),
+        'isp_host': cfg.get('isp', 'tcp_host', fallback='192.168.3.1'),
         'isp_port': cfg.getint('isp', 'tcp_port', fallback=9001),
-        'mcu_host': cfg.get('mcu', 'tcp_host', fallback='10.9.8.8'),
+        'mcu_host': cfg.get('mcu', 'tcp_host', fallback='192.168.3.1'),
         'mcu_port': cfg.getint('mcu', 'tcp_port', fallback=9002),
-        'voodoo_host': cfg.get('voodoo', 'host', fallback='10.9.8.8'),
+        'voodoo_host': cfg.get('voodoo', 'host', fallback='192.168.3.1'),
         'voodoo_port': cfg.getint('voodoo', 'modbus_port', fallback=502),
-        'server_ip': cfg.get('server', 'host_ip', fallback='10.9.8.7'),
+        'server_ip': cfg.get('server', 'host_ip', fallback='192.168.3.1'),
     }
 
 
@@ -483,6 +483,28 @@ class DeviceTestBase:
         lines_after = len(self.mcu.get_lines())
         return lines_after == lines_before
 
+    # --- Battery / ALWAYS_ON detection ---
+
+    def check_always_on(self):
+        """Issue 'battery info' on MCU console, return True if bAlwaysOnMode = true.
+
+        When battery is >95% and USB is plugged, the device enters ALWAYS_ON mode
+        and will never sleep. Callers should unplug USB or skip waiting for sleep.
+        """
+        if not self.mcu or not self.mcu.sock:
+            return False
+        try:
+            self.mcu.clear_lines()
+            self.mcu.sock.sendall(b"battery info\r\n")
+            time.sleep(3)
+            lines = self.mcu.get_lines()
+            for line in lines:
+                if "bAlwaysOnMode = true" in line or "bAlwaysOnMode=true" in line:
+                    return True
+            return False
+        except OSError:
+            return False
+
     # --- Voodoo board control ---
 
     def press_button(self, channel, duration=0.3, retries=3):
@@ -515,6 +537,18 @@ class DeviceTestBase:
             [sys.executable, self._voodoo_script, "--off", str(channel)],
             capture_output=True, timeout=10, text=True)
         return result.returncode == 0
+
+    def voodoo_on_pair(self, channel_a, channel_b):
+        """Turn two voodoo DOs on together."""
+        ok_a = self.voodoo_on(channel_a)
+        ok_b = self.voodoo_on(channel_b)
+        return ok_a and ok_b
+
+    def voodoo_off_pair(self, channel_a, channel_b):
+        """Turn two voodoo DOs off together."""
+        ok_a = self.voodoo_off(channel_a)
+        ok_b = self.voodoo_off(channel_b)
+        return ok_a and ok_b
 
     # --- Log saving ---
 

@@ -85,6 +85,7 @@ def main():
                         help='Pulse duration in seconds (default 2)')
 
     args = parser.parse_args()
+    print(f"host = {args.host}")
 
     sock = connect(args.host, args.port)
     try:
@@ -114,11 +115,13 @@ def main():
             parser.print_help()
             sys.exit(1)
 
-        value = 1 << args.do_num
-        write_do(sock, value, 1)
+        cur = read_do(sock, 1)
+        new_val = cur | (1 << args.do_num)
+        write_do(sock, new_val, 2)
         print(f"DO{args.do_num} ON")
         time.sleep(args.duration)
-        write_do(sock, 0x0000, 2)
+        restore = new_val & ~(1 << args.do_num)
+        write_do(sock, restore, 3)
         print(f"DO{args.do_num} OFF (after {args.duration}s)")
     finally:
         sock.close()
