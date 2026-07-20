@@ -11,7 +11,6 @@ Usage:
 import configparser
 import os
 import socket
-import subprocess
 import sys
 import threading
 import time
@@ -364,8 +363,14 @@ class DeviceTestBase:
         self.event_signal = threading.Event()
         self.results = []
         self._cfg = get_serial_mux_config()
-        self._voodoo_script = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "voodoo", "voodoo_do_pulse.py")
+        self._voodoo = None
+
+    def _get_voodoo(self):
+        if self._voodoo is None:
+            from voodoo.voodoo_do_pulse import VoodooBoard
+            self._voodoo = VoodooBoard()
+            self._voodoo.connect()
+        return self._voodoo
 
     # --- Event queue ---
 
@@ -451,6 +456,9 @@ class DeviceTestBase:
             self.mcu.disconnect()
         if self.isp:
             self.isp.disconnect()
+        if self._voodoo:
+            self._voodoo.disconnect()
+            self._voodoo = None
 
     def reconnect_consoles(self):
         """Disconnect and reconnect both readers (creates new threads)."""
@@ -511,32 +519,34 @@ class DeviceTestBase:
         """Pulse voodoo DO channel. Returns True on success."""
         for attempt in range(retries):
             try:
-                result = subprocess.run(
-                    [sys.executable, self._voodoo_script, str(channel), str(duration)],
-                    capture_output=True, timeout=15, text=True)
-                if result.returncode == 0:
-                    return True
-                print(f"  [WARN] voodoo attempt {attempt+1}/{retries} failed: "
-                      f"{result.stderr.strip()}")
-            except subprocess.TimeoutExpired:
-                print(f"  [WARN] voodoo attempt {attempt+1}/{retries} timed out")
+                self._get_voodoo().pulse(channel, duration)
+                return True
+            except (OSError, RuntimeError) as e:
+                print(f"  [WARN] voodoo attempt {attempt+1}/{retries} failed: {e}")
+                self._voodoo = None
             time.sleep(1)
         print(f"  [ERROR] voodoo pulse DO{channel} failed after {retries} retries")
         return False
 
     def voodoo_on(self, channel):
         """Turn voodoo DO on indefinitely."""
-        result = subprocess.run(
-            [sys.executable, self._voodoo_script, "--on", str(channel)],
-            capture_output=True, timeout=10, text=True)
-        return result.returncode == 0
+        try:
+            self._get_voodoo().on(channel)
+            return True
+        except (OSError, RuntimeError) as e:
+            print(f"  [ERROR] voodoo on DO{channel}: {e}", file=sys.stderr)
+            self._voodoo = None
+            return False
 
     def voodoo_off(self, channel):
         """Turn voodoo DO off."""
-        result = subprocess.run(
-            [sys.executable, self._voodoo_script, "--off", str(channel)],
-            capture_output=True, timeout=10, text=True)
-        return result.returncode == 0
+        try:
+            self._get_voodoo().off(channel)
+            return True
+        except (OSError, RuntimeError) as e:
+            print(f"  [ERROR] voodoo off DO{channel}: {e}", file=sys.stderr)
+            self._voodoo = None
+            return False
 
     def voodoo_on_pair(self, channel_a, channel_b):
         """Turn two voodoo DOs on together."""
@@ -549,6 +559,15 @@ class DeviceTestBase:
         ok_a = self.voodoo_off(channel_a)
         ok_b = self.voodoo_off(channel_b)
         return ok_a and ok_b
+
+    def voodoo_read(self):
+        """Read current DO register state. Returns int or None."""
+        try:
+            return self._get_voodoo().read()
+        except (OSError, RuntimeError) as e:
+            print(f"  [ERROR] voodoo read: {e}", file=sys.stderr)
+            self._voodoo = None
+            return None
 
     # --- Log saving ---
 

@@ -19,12 +19,14 @@ import time
 import paramiko
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(SCRIPT_DIR, ".."))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DUT_INI = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'dut.ini')
 SERIAL_MUX_INI = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini')
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, '..', 'voodoo', 'voodoo_do_pulse.py')
 CORES_PATH = '/data/cores'
 MAX_WAKE_ATTEMPTS = 5
+
+from voodoo.voodoo_do_pulse import VoodooBoard
 
 
 def read_config():
@@ -47,10 +49,8 @@ def ping(host):
 
 def wake_device():
     print('  Pressing SYNC button...')
-    subprocess.run(
-        ['python3', VOODOO_SCRIPT, '0', '2'],
-        capture_output=True
-    )
+    with VoodooBoard() as vb:
+        vb.pulse(0, duration=2.0)
     time.sleep(10)
 
 

@@ -14,7 +14,6 @@ Output: per-transition latency and summary statistics (min/max/avg/median).
 
 import argparse
 import os
-import subprocess
 import sys
 import time
 
@@ -40,17 +39,7 @@ class DaynightLatencyTest(DeviceTestBase):
 
     def voodoo_read_do(self):
         """Read current DO register value. Returns int or None on failure."""
-        result = subprocess.run(
-            [sys.executable, self._voodoo_script, "--read"],
-            capture_output=True, timeout=10, text=True)
-        if result.returncode != 0:
-            return None
-        for line in result.stdout.splitlines():
-            if "DO register:" in line:
-                # "DO register: 0x0020 (binary: 00100000)"
-                hex_str = line.split("0x")[1].split()[0]
-                return int(hex_str, 16)
-        return None
+        return self.voodoo_read()
 
     def _check_events(self, line, source):
         if source != "MCU":

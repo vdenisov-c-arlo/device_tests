@@ -15,12 +15,13 @@ If no URL is given, finds the latest .enc in output/lory-2k/images/.
 import configparser
 import os
 import re
-import subprocess
 import sys
 import time
 import socket as sock_mod
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(SCRIPT_DIR, ".."))
+
 INI_PATH = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini')
 
 _cfg = configparser.ConfigParser()
@@ -30,8 +31,9 @@ ISP_TCP_HOST = _cfg.get('isp', 'tcp_host', fallback='127.0.0.1')
 ISP_TCP_PORT = _cfg.getint('isp', 'tcp_port', fallback=9001)
 SERVER_IP = _cfg.get('server', 'host_ip', fallback='192.168.100.75')
 
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, '..', 'voodoo', 'voodoo_do_pulse.py')
 IMAGES_DIR = os.path.join(os.getcwd(), 'output', 'lory-2k', 'images')
+
+from voodoo.voodoo_do_pulse import VoodooBoard
 
 
 class SocketSerial:
@@ -165,16 +167,11 @@ def get_fwupgrade_url():
 
 def wake_device():
     print('=== Waking device (3x SYNC button press) ===')
-    for i in range(3):
-        result = subprocess.run(
-            ['python3', VOODOO_SCRIPT, '0', '1'],
-            capture_output=True, text=True
-        )
-        print(f'  press {i+1}: {result.stdout.strip()}')
-        if result.returncode != 0:
-            print(f'ERROR: voodoo pulse failed: {result.stderr}')
-            sys.exit(1)
-        time.sleep(1)
+    with VoodooBoard() as vb:
+        for i in range(3):
+            vb.pulse(0, duration=1.0)
+            print(f'  press {i+1}: done')
+            time.sleep(1)
     time.sleep(5)
 
 

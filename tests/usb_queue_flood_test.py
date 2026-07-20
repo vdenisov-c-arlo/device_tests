@@ -20,7 +20,6 @@ import argparse
 import socket
 import time
 import threading
-import subprocess
 import sys
 import os
 from datetime import datetime
@@ -32,11 +31,11 @@ from lib.mcu_patterns import (
     AnomalyType, is_crash_dump_line, save_crash_dump,
 )
 from lib.console_utils import get_serial_mux_config
+from voodoo.voodoo_do_pulse import VoodooBoard
 
 sys.stdout.reconfigure(line_buffering=True)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, "..", "voodoo", "voodoo_do_pulse.py")
 _cfg = get_serial_mux_config()
 MCU_HOST = _cfg['mcu_host']
 MCU_PORT = _cfg['mcu_port']
@@ -133,12 +132,34 @@ class MCUReader(threading.Thread):
                     time.sleep(0.5)
 
 
+_vb = None
+
+def _get_voodoo():
+    global _vb
+    if _vb is None:
+        _vb = VoodooBoard()
+        _vb.connect()
+    return _vb
+
 def voodoo(args):
-    cmd = [sys.executable, VOODOO_SCRIPT] + args
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    if result.returncode != 0:
-        print(f"  [ERR] voodoo: {result.stderr.strip()}")
-    return result.returncode == 0
+    try:
+        vb = _get_voodoo()
+        if args[0] == "--on":
+            vb.on(int(args[1]))
+        elif args[0] == "--off":
+            vb.off(int(args[1]))
+        elif args[0] == "--read":
+            vb.read()
+        else:
+            do_num = int(args[0])
+            duration = float(args[1]) if len(args) > 1 else 2.0
+            vb.pulse(do_num, duration)
+        return True
+    except (OSError, RuntimeError) as e:
+        global _vb
+        print(f"  [ERR] voodoo: {e}")
+        _vb = None
+        return False
 
 
 def wait_for_sleep(reader, timeout=120):
