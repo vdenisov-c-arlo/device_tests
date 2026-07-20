@@ -7,7 +7,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import SerialMuxReader, get_serial_mux_config, isp_init_console
+from lib.console_utils import SerialMuxReader, get_serial_mux_config, isp_init_console
 
 LOG_DIR = "/tmp/console_capture"
 

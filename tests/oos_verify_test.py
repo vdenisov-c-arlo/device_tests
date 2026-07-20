@@ -31,7 +31,7 @@ import time
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase
+from lib.console_utils import DeviceTestBase
 
 sys.stdout.reconfigure(line_buffering=True)
 

@@ -46,15 +46,15 @@ from bleak import BleakScanner, BleakClient
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ble_onboard_constants import *
-from ble_onboard_crypto import (
+from onboard.ble_onboard_constants import *
+from onboard.ble_onboard_crypto import (
     generate_keypair,
     compute_shared_secret,
     encrypt_value,
 )
-from ble_onboard_serial import SerialMuxClient, disable_fota
-from ble_onboard_cloud import ArloCloudClient
-from voodoo_do_pulse import connect as voodoo_connect, write_do, read_do
+from onboard.ble_onboard_serial import SerialMuxClient, disable_fota
+from onboard.ble_onboard_cloud import ArloCloudClient
+from voodoo.voodoo_do_pulse import connect as voodoo_connect, write_do, read_do
 
 SYNC_BUTTON_DO = 0
 sys.stdout.reconfigure(line_buffering=True)
@@ -254,7 +254,7 @@ class BleOnboarder:
     def step_wake(self):
         """Wake device from shipping mode via Voodoo SYNC button."""
         print("\n=== STEP: wake ===")
-        from voodoo_do_pulse import MODBUS_TCP_PORT, DEFAULT_HOST
+        from voodoo.voodoo_do_pulse import MODBUS_TCP_PORT, DEFAULT_HOST
         sock = voodoo_connect(DEFAULT_HOST, MODBUS_TCP_PORT)
         try:
             print("  Long SYNC press (15s) — wake from shipping...")

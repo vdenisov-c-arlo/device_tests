@@ -16,7 +16,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import get_serial_mux_config
+from lib.console_utils import get_serial_mux_config
 
 _cfg = get_serial_mux_config()
 

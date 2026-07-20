@@ -33,15 +33,15 @@ from datetime import datetime
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase, SerialMuxReader, isp_init_console, _recv_all, _drain_sock
-from mcu_patterns import (
+from lib.console_utils import DeviceTestBase, SerialMuxReader, isp_init_console, _recv_all, _drain_sock
+from lib.mcu_patterns import (
     SLEEP_INDICATOR, ISP_OFF_PATTERNS, SBU_PATTERNS,
     check_mcu_line, AnomalyType, is_crash_dump_line, save_crash_dump,
 )
 
 sys.stdout.reconfigure(line_buffering=True)
 
-from voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from voodoo.voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 CRASH_TARGET_PATTERNS = [
     "Core dump:",

@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
-from ble_onboard_constants import (
+from onboard.ble_onboard_constants import (
     COMMISSIONER_KEY_SIZE,
     PBKDF2_ITERATIONS,
     PBKDF2_OUTPUT_SIZE,

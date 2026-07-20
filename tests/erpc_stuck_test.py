@@ -24,8 +24,8 @@ import os
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase
-from mcu_patterns import (
+from lib.console_utils import DeviceTestBase
+from lib.mcu_patterns import (
     CRASH_PATTERNS, HANG_PATTERNS, SLEEP_INDICATOR,
     is_crash_dump_line,
 )
@@ -34,7 +34,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 NUM_CYCLES = int(sys.argv[1]) if len(sys.argv) > 1 else 20
 
-from voodoo_channels import DO_SYNC as SYNC_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from voodoo.voodoo_channels import DO_SYNC as SYNC_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 ERPC_STANDBY_PATTERN = "eRPC from DOWN to STANDBY"
 ERPC_DOWN_PATTERN = "pga_sm_set_rpc_down"

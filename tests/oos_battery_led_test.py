@@ -22,8 +22,8 @@ import time
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase
-from mcu_patterns import (
+from lib.console_utils import DeviceTestBase
+from lib.mcu_patterns import (
     CRASH_PATTERNS, HANG_PATTERNS, SLEEP_INDICATOR,
     check_mcu_line, check_isp_line, is_crash_dump_line,
 )

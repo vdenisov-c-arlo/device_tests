@@ -27,8 +27,8 @@ from datetime import datetime
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase, SerialMuxReader
-from mcu_patterns import (
+from lib.console_utils import DeviceTestBase, SerialMuxReader
+from lib.mcu_patterns import (
     SLEEP_INDICATOR, MCU_CRASH_PATTERNS, MCU_HANG_PATTERNS,
     check_mcu_line, check_isp_line, AnomalyType,
     is_crash_dump_line, save_crash_dump,
@@ -36,7 +36,7 @@ from mcu_patterns import (
 
 sys.stdout.reconfigure(line_buffering=True)
 
-from voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from voodoo.voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 VOODOO_HOST = "192.168.3.1"
 
 QUEUE_OVERFLOW_PATTERNS = [
@@ -384,7 +384,7 @@ class USBQueueOverflowTest(DeviceTestBase):
     def connect_consoles(self):
         super().connect_consoles()
         if self.isp and self.isp.sock:
-            from console_utils import isp_init_console
+            from lib.console_utils import isp_init_console
             isp_init_console(self.isp.sock)
 
     def run(self, num_cycles=None):

@@ -19,9 +19,9 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase
-from voodoo_channels import DO_AMBLIGHT
-from mcu_patterns import MCU_CRASH_PATTERNS, AnomalyType
+from lib.console_utils import DeviceTestBase
+from voodoo.voodoo_channels import DO_AMBLIGHT
+from lib.mcu_patterns import MCU_CRASH_PATTERNS, AnomalyType
 
 
 EVT_MCU_DAY = "mcu_day"

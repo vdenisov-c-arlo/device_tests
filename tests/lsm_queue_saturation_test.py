@@ -45,12 +45,12 @@ from enum import Enum, auto
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(line_buffering=True)
 
-from console_utils import DeviceTestBase, SerialMuxReader
-from mcu_patterns import (
+from lib.console_utils import DeviceTestBase, SerialMuxReader
+from lib.mcu_patterns import (
     MCU_CRASH_PATTERNS, ISP_CRASH_PATTERNS,
     check_mcu_line, check_isp_line, AnomalyType,
 )
-from voodoo_channels import DO_AMBLIGHT, DO_PIR
+from voodoo.voodoo_channels import DO_AMBLIGHT, DO_PIR
 
 
 class Event(Enum):

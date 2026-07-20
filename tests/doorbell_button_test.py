@@ -15,13 +15,13 @@ from datetime import datetime
 from enum import Enum, auto
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from console_utils import DeviceTestBase, isp_init_console
+from lib.console_utils import DeviceTestBase, isp_init_console
 
 sys.stdout.reconfigure(line_buffering=True)
 
 NUM_CYCLES = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 
-from voodoo_channels import DO_FRONT as FRONT_BUTTON_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from voodoo.voodoo_channels import DO_FRONT as FRONT_BUTTON_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 CRASH_PATTERNS = [
     "segfault", "kernel panic", "coredump", "Assertion failed", "Oops:",
