@@ -44,7 +44,7 @@ import time
 
 from bleak import BleakScanner, BleakClient
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from onboard.ble_onboard_constants import *
 from onboard.ble_onboard_crypto import (

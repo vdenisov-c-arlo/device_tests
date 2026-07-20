@@ -42,7 +42,7 @@ import time
 from datetime import datetime
 from enum import Enum, auto
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.stdout.reconfigure(line_buffering=True)
 
 from lib.console_utils import DeviceTestBase, SerialMuxReader

@@ -32,7 +32,7 @@ import time
 from datetime import datetime
 from enum import Enum, auto
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import DeviceTestBase, SerialMuxReader, isp_init_console, _recv_all, _drain_sock
 from lib.mcu_patterns import (
     SLEEP_INDICATOR, ISP_OFF_PATTERNS, SBU_PATTERNS,

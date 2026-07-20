@@ -18,7 +18,7 @@ import threading
 import time
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import get_serial_mux_config, isp_init_console, SerialMuxReader
 
 LOG_DIR = "/tmp/stream_stop_debug"

@@ -27,7 +27,7 @@ import os
 import socket
 from enum import Enum, auto
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import DeviceTestBase, SerialMuxReader, isp_init_console, _recv_all, _drain_sock
 from voodoo.voodoo_channels import DO_SYNC, DO_RESET
 

@@ -8,6 +8,8 @@ import struct
 import time
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 _ini = configparser.ConfigParser()
 _ini.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'serial_mux.ini'))
 

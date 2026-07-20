@@ -25,7 +25,7 @@ import sys
 import os
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.mcu_patterns import (
     SLEEP_INDICATOR, ISP_OFF_PATTERNS, ISP_WAKE_PATTERNS, SBU_PATTERNS,
     SLEEP_VOTE_PATTERNS, check_for_anomalies, check_mcu_line,

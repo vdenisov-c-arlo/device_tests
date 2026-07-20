@@ -37,7 +37,7 @@ except ImportError:
 
 from playwright.sync_api import sync_playwright
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import DeviceTestBase, isp_init_console
 from lib.mcu_patterns import is_crash_dump_line, save_crash_dump
 
