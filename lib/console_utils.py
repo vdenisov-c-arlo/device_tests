@@ -365,7 +365,7 @@ class DeviceTestBase:
         self.results = []
         self._cfg = get_serial_mux_config()
         self._voodoo_script = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "voodoo_do_pulse.py")
+            os.path.dirname(os.path.abspath(__file__)), "..", "voodoo", "voodoo_do_pulse.py")
 
     # --- Event queue ---
 

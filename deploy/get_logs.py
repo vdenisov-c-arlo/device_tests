@@ -20,9 +20,9 @@ import paramiko
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
-DUT_INI = os.path.join(SCRIPT_DIR, 'serial_mux', 'dut.ini')
-SERIAL_MUX_INI = os.path.join(SCRIPT_DIR, 'serial_mux', 'serial_mux.ini')
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, 'voodoo_do_pulse.py')
+DUT_INI = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'dut.ini')
+SERIAL_MUX_INI = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini')
+VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, '..', 'voodoo', 'voodoo_do_pulse.py')
 MAX_WAKE_ATTEMPTS = 5
 
 
@@ -58,7 +58,7 @@ def wake_device():
 
 def discover_ip_via_serial():
     """Try to get DUT IP from serial console if serial_mux is running."""
-    client_bin = os.path.join(SCRIPT_DIR, 'serial_mux', 'serial_mux_client')
+    client_bin = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux_client')
     if not os.path.isfile(client_bin):
         return None
 

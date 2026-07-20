@@ -36,7 +36,7 @@ from lib.console_utils import get_serial_mux_config
 sys.stdout.reconfigure(line_buffering=True)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, "voodoo_do_pulse.py")
+VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, "..", "voodoo", "voodoo_do_pulse.py")
 _cfg = get_serial_mux_config()
 MCU_HOST = _cfg['mcu_host']
 MCU_PORT = _cfg['mcu_port']

@@ -21,7 +21,7 @@ import time
 import socket as sock_mod
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-INI_PATH = os.path.join(SCRIPT_DIR, 'serial_mux', 'serial_mux.ini')
+INI_PATH = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini')
 
 _cfg = configparser.ConfigParser()
 _cfg.read(INI_PATH)
@@ -30,7 +30,7 @@ ISP_TCP_HOST = _cfg.get('isp', 'tcp_host', fallback='127.0.0.1')
 ISP_TCP_PORT = _cfg.getint('isp', 'tcp_port', fallback=9001)
 SERVER_IP = _cfg.get('server', 'host_ip', fallback='192.168.100.75')
 
-VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, 'voodoo_do_pulse.py')
+VOODOO_SCRIPT = os.path.join(SCRIPT_DIR, '..', 'voodoo', 'voodoo_do_pulse.py')
 IMAGES_DIR = os.path.join(os.getcwd(), 'output', 'lory-2k', 'images')
 
 
@@ -100,7 +100,7 @@ def open_connection():
         s.close()
     except (ConnectionRefusedError, OSError):
         print(f'ERROR: serial_mux not running on {ISP_TCP_HOST}:{ISP_TCP_PORT}')
-        print(f'Please run: {os.path.join(SCRIPT_DIR, "serial_mux", "serial_terminals.sh")}')
+        print(f'Please run: {os.path.join(SCRIPT_DIR, "..", "serial_mux", "serial_terminals.sh")}')
         sys.exit(1)
 
     try:
