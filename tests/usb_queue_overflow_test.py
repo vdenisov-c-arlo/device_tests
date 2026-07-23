@@ -2,7 +2,7 @@
 """USB rapid plug/unplug stress test — trigger MCU main task queue overflow.
 
 Rapidly toggles USB (DO6) to flood the MCU task queue with SBU events.
-The burst runs directly on the voodoo board (~3ms Modbus RTT) for maximum speed.
+The burst runs directly on the testbot4 (~3ms Modbus RTT) for maximum speed.
 Log analysis runs locally via serial_mux as usual.
 
 On queue overflow detection, saves logs, resets DUT, and continues to next cycle.
@@ -15,7 +15,7 @@ Usage:
 Prerequisites:
     - Device claimed, ISP awake (USB plugged)
     - serial_mux running (MCU on port 9002, ISP on port 9001)
-    - Voodoo board reachable at 192.168.3.1 (SSH as root)
+    - testbot4 reachable at 192.168.7.100 (SSH as root)
 """
 
 import argparse
@@ -36,8 +36,8 @@ from lib.mcu_patterns import (
 
 sys.stdout.reconfigure(line_buffering=True)
 
-from voodoo.voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
-VOODOO_HOST = "192.168.3.1"
+from testbot4.testbot4_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+TESTBOT4_HOST = "192.168.7.100"
 
 QUEUE_OVERFLOW_PATTERNS = [
     "xQueueSend fail",
@@ -47,8 +47,8 @@ QUEUE_OVERFLOW_PATTERNS = [
     "mainTask queue",
 ]
 
-# Script deployed to voodoo board for fast local toggling
-VOODOO_BURST_SCRIPT = '''\
+# Script deployed to testbot4 for fast local toggling
+TESTBOT4_BURST_SCRIPT = '''\
 import socket, struct, time, sys
 
 def modbus_write(sock, reg, value, tid):
@@ -138,12 +138,12 @@ class USBQueueOverflowTest(DeviceTestBase):
             self._session_log.flush()
 
     def _deploy_burst_script(self):
-        """Deploy the fast toggle script to the voodoo board."""
+        """Deploy the fast toggle script to the testbot4."""
         if self._burst_script_deployed:
             return True
         result = subprocess.run(
-            ["ssh", f"root@{VOODOO_HOST}",
-             f"cat > /tmp/usb_burst.py << 'ENDOFSCRIPT'\n{VOODOO_BURST_SCRIPT}ENDOFSCRIPT"],
+            ["ssh", f"root@{TESTBOT4_HOST}",
+             f"cat > /tmp/usb_burst.py << 'ENDOFSCRIPT'\n{TESTBOT4_BURST_SCRIPT}ENDOFSCRIPT"],
             capture_output=True, timeout=10, text=True)
         if result.returncode != 0:
             print(f"  [ERROR] Failed to deploy burst script: {result.stderr}")
@@ -152,16 +152,16 @@ class USBQueueOverflowTest(DeviceTestBase):
         return True
 
     def _run_burst_remote(self):
-        """Execute the burst on the voodoo board. Returns True on success."""
+        """Execute the burst on the testbot4. Returns True on success."""
         result = subprocess.run(
-            ["ssh", f"root@{VOODOO_HOST}",
+            ["ssh", f"root@{TESTBOT4_HOST}",
              f"python3 /tmp/usb_burst.py {self.bursts_per_cycle} {self.interval_s} {USB_DO_CHANNEL}"],
             capture_output=True, timeout=60, text=True)
         if result.returncode != 0:
             print(f"  [ERROR] Burst execution failed: {result.stderr[:200]}")
             return False
         if result.stdout.strip():
-            print(f"  [VOODOO] {result.stdout.strip()}")
+            print(f"  [TESTBOT4] {result.stdout.strip()}")
         return True
 
     def _run_cycle(self, cycle):
@@ -175,7 +175,7 @@ class USBQueueOverflowTest(DeviceTestBase):
 
         # Ensure USB starts plugged (device awake)
         print("  [1] Ensure USB plugged (device awake)")
-        self.voodoo_on(USB_DO_CHANNEL)
+        self.testbot4_on(USB_DO_CHANNEL)
         time.sleep(5)
 
         # Discard any boot messages from console init — not a real crash
@@ -192,10 +192,10 @@ class USBQueueOverflowTest(DeviceTestBase):
             self.isp.clear_lines()
             self.isp.start_recording()
 
-        # Run rapid toggles on voodoo board
+        # Run rapid toggles on testbot4
         burst_duration = self.bursts_per_cycle * self.interval_s
         print(f"  [2] Running {self.bursts_per_cycle} USB toggles @ "
-              f"{self.interval_s*1000:.0f}ms on voodoo board "
+              f"{self.interval_s*1000:.0f}ms on testbot4 "
               f"(~{burst_duration:.1f}s)...")
 
         if not self._run_burst_remote():
@@ -354,7 +354,7 @@ class USBQueueOverflowTest(DeviceTestBase):
         self.mcu.start_recording()
 
         # Plug USB to keep device awake
-        self.voodoo_on(USB_DO_CHANNEL)
+        self.testbot4_on(USB_DO_CHANNEL)
 
         print("  [RESET] Waiting for MCU boot (30s)...")
         time.sleep(30)
@@ -390,10 +390,10 @@ class USBQueueOverflowTest(DeviceTestBase):
     def run(self, num_cycles=None):
         os.makedirs(self._log_dir, exist_ok=True)
 
-        # Deploy burst script to voodoo board
-        print("[INIT] Deploying burst script to voodoo board...")
+        # Deploy burst script to testbot4
+        print("[INIT] Deploying burst script to testbot4...")
         if not self._deploy_burst_script():
-            print("[ABORT] Cannot deploy to voodoo board")
+            print("[ABORT] Cannot deploy to testbot4")
             return 1
 
         session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -405,7 +405,7 @@ class USBQueueOverflowTest(DeviceTestBase):
             f"# Started: {datetime.now().isoformat()}\n"
             f"# Cycles: {self.num_cycles}, Bursts/cycle: {self.bursts_per_cycle}, "
             f"Interval: {self.interval_s*1000:.0f}ms, Cooldown: {self.cooldown_s}s\n"
-            f"# Burst execution: voodoo board ({VOODOO_HOST})\n\n")
+            f"# Burst execution: testbot4 ({TESTBOT4_HOST})\n\n")
 
         print(f"=== USB Queue Overflow Stress Test ===")
         print(f"  Cycles:          {self.num_cycles}")
@@ -414,7 +414,7 @@ class USBQueueOverflowTest(DeviceTestBase):
         print(f"  Observe window:  {self.observe_s}s")
         print(f"  Recovery window: {self.recovery_s}s")
         print(f"  Cooldown:        {self.cooldown_s}s")
-        print(f"  Burst host:      {VOODOO_HOST} (local Modbus ~3ms RTT)")
+        print(f"  Burst host:      {TESTBOT4_HOST} (local Modbus ~3ms RTT)")
         print(f"  Session log:     {session_path}")
         print()
 

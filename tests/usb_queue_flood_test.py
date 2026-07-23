@@ -13,7 +13,7 @@ Usage:
 Prerequisites:
     - Device claimed, battery mode
     - serial_mux running (MCU on port 9002)
-    - Voodoo board reachable (DO6 = USB plug)
+    - testbot4 reachable (DO6 = USB plug)
 """
 
 import argparse
@@ -31,7 +31,7 @@ from lib.mcu_patterns import (
     AnomalyType, is_crash_dump_line, save_crash_dump,
 )
 from lib.console_utils import get_serial_mux_config
-from voodoo.voodoo_do_pulse import VoodooBoard
+from testbot4.testbot4_do_pulse import Testbot4
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -134,16 +134,16 @@ class MCUReader(threading.Thread):
 
 _vb = None
 
-def _get_voodoo():
+def _get_testbot4():
     global _vb
     if _vb is None:
-        _vb = VoodooBoard()
+        _vb = Testbot4()
         _vb.connect()
     return _vb
 
-def voodoo(args):
+def testbot4_cmd(args):
     try:
-        vb = _get_voodoo()
+        vb = _get_testbot4()
         if args[0] == "--on":
             vb.on(int(args[1]))
         elif args[0] == "--off":
@@ -157,7 +157,7 @@ def voodoo(args):
         return True
     except (OSError, RuntimeError) as e:
         global _vb
-        print(f"  [ERR] voodoo: {e}")
+        print(f"  [ERR] testbot4: {e}")
         _vb = None
         return False
 
@@ -199,9 +199,9 @@ def wait_for_sleep(reader, timeout=120):
 
 
 def reset_device(reader):
-    """Hardware-reset via voodoo board button press."""
+    """Hardware-reset via testbot4 button press."""
     print("  [RESET] Pressing reset button...")
-    voodoo(["2", "1"])
+    testbot4_cmd(["2", "1"])
     print("  [RESET] Waiting 60s for device to boot...")
     reader.start_recording()
     time.sleep(60)
@@ -233,13 +233,13 @@ def run_flood_test(reader, num_cycles, interval_s, burst_count, observe_time):
 
         # Step 1: Ensure USB unplugged, wait for deep sleep
         print("  [1] Unplug USB, waiting for deep sleep...")
-        voodoo(["--off", "6"])
+        testbot4_cmd(["--off", "6"])
         reader.start_recording()
 
         if not wait_for_sleep(reader):
             print("  [!] Device didn't enter sleep — skipping cycle")
             results["fail_no_sleep"] += 1
-            voodoo(["--on", "6"])
+            testbot4_cmd(["--on", "6"])
             time.sleep(5)
             continue
 
@@ -248,9 +248,9 @@ def run_flood_test(reader, num_cycles, interval_s, burst_count, observe_time):
         print(f"  [2] Firing {burst_count} USB toggles ({interval_s}s interval)...")
 
         for i in range(burst_count):
-            voodoo(["--on", "6"])
+            testbot4_cmd(["--on", "6"])
             time.sleep(interval_s)
-            voodoo(["--off", "6"])
+            testbot4_cmd(["--off", "6"])
             time.sleep(interval_s)
 
             # Check if we already triggered the flood mid-burst
@@ -314,7 +314,7 @@ def run_flood_test(reader, num_cycles, interval_s, burst_count, observe_time):
         results["pass"] += 1
 
         # Leave USB unplugged for next cycle's sleep
-        voodoo(["--off", "6"])
+        testbot4_cmd(["--off", "6"])
         time.sleep(5)
 
     # Summary

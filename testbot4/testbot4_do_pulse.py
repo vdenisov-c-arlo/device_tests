@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Control digital outputs on the voodooboard.
+"""Control digital outputs on the testbot4.
 
 Usage (CLI):
-  voodoo_do_pulse.py <do_num> [duration]       Pulse DO for duration seconds (default 2s)
-  voodoo_do_pulse.py --on <do_num>             Turn DO on indefinitely
-  voodoo_do_pulse.py --off <do_num>            Turn DO off
-  voodoo_do_pulse.py --read                    Read current DO register state
+  testbot4_do_pulse.py <do_num> [duration]       Pulse DO for duration seconds (default 2s)
+  testbot4_do_pulse.py --on <do_num>             Turn DO on indefinitely
+  testbot4_do_pulse.py --off <do_num>            Turn DO off
+  testbot4_do_pulse.py --read                    Read current DO register state
 
 Usage (library):
-  from voodoo.voodoo_do_pulse import VoodooBoard
-  vb = VoodooBoard()
-  vb.pulse(7, duration=2.0)
-  vb.on(6)
-  vb.off(6)
-  state = vb.read()
+  from testbot4.testbot4_do_pulse import Testbot4
+  tb = Testbot4()
+  tb.pulse(7, duration=2.0)
+  tb.on(6)
+  tb.off(6)
+  state = tb.read()
 """
 
 import argparse
@@ -30,13 +30,13 @@ _cfg = get_serial_mux_config()
 
 SLAVE_ADDR = 0xFF
 DO_REGISTER = 1  # MBHR_DISCRETE_OUTPUTS_LOW
-MODBUS_TCP_PORT = _cfg['voodoo_port']
-DEFAULT_HOST = _cfg['voodoo_host']
+MODBUS_TCP_PORT = _cfg['testbot4_port']
+DEFAULT_HOST = _cfg['testbot4_host']
 DEFAULT_DURATION = 2.0
 
 
-class VoodooBoard:
-    """Modbus TCP client for voodooboard digital output control.
+class Testbot4:
+    """Modbus TCP client for testbot4 digital output control.
 
     Maintains a persistent connection and uses read-modify-write for all
     operations to preserve the state of other DO channels.
@@ -148,6 +148,9 @@ class VoodooBoard:
         self.disconnect()
 
 
+VoodooBoard = Testbot4  # backwards compat alias
+
+
 # --- Legacy function API (used by ble_onboard.py) ---
 
 def connect(host=None, port=None):
@@ -202,11 +205,11 @@ def read_do(sock, tid):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Voodooboard digital output control")
+    parser = argparse.ArgumentParser(description="Testbot4 digital output control")
     parser.add_argument('--on', type=int, metavar='DO', help='Turn DO on indefinitely')
     parser.add_argument('--off', type=int, metavar='DO', help='Turn DO off')
     parser.add_argument('--read', action='store_true', help='Read current DO register state')
-    parser.add_argument('--host', default=DEFAULT_HOST, help='Voodooboard IP')
+    parser.add_argument('--host', default=DEFAULT_HOST, help='Testbot4 IP')
     parser.add_argument('--port', type=int, default=MODBUS_TCP_PORT, help='Modbus TCP port')
     parser.add_argument('do_num', nargs='?', type=int, help='DO number for pulse mode')
     parser.add_argument('duration', nargs='?', type=float, default=DEFAULT_DURATION,
@@ -214,7 +217,7 @@ def main():
 
     args = parser.parse_args()
 
-    with VoodooBoard(args.host, args.port) as vb:
+    with Testbot4(args.host, args.port) as vb:
         if args.read:
             value = vb.read()
             print(f"DO register: 0x{value:04X} (binary: {value:08b})")

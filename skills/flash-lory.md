@@ -1,6 +1,6 @@
 ---
 name: flash-lory
-description: Flash Lory firmware via UART. Wakes device via voodoo board SYNC button, logs in to ISP console, waits for network, and issues fwupgrade.
+description: Flash Lory firmware via UART. Wakes device via testbot4 SYNC button, logs in to ISP console, waits for network, and issues fwupgrade.
 ---
 
 # Flash Lory
@@ -12,40 +12,40 @@ After a successful `make lory-2k` or `make lory-2k-refresh` build, to deploy the
 ## Prerequisites
 
 - A successful build with an `.enc` file in `output/lory-2k/images/`.
-- Voodoo board reachable at **192.168.3.1** (remote, not local USB).
-- **serial_mux runs on the voodoo board** — ISP console at `192.168.3.1:9001`, MCU console at `192.168.3.1:9002`. It is always running on the voodoo board; do NOT check localhost.
+- Testbot4 reachable at **192.168.7.100** (remote, not local USB).
+- **serial_mux runs on the testbot4** — ISP console at `192.168.7.100:9001`, MCU console at `192.168.7.100:9002`. It is always running on the testbot4; do NOT check localhost.
 
 ## Steps
 
 ### 1. Check serial_mux is reachable (REQUIRED)
 
-serial_mux runs on the remote voodoo board, not locally:
+serial_mux runs on the remote testbot4, not locally:
 
 ```bash
-nc -z -w2 192.168.3.1 9001 && echo "OK" || echo "NOT reachable"
+nc -z -w2 192.168.7.100 9001 && echo "OK" || echo "NOT reachable"
 ```
 
-**If not reachable**, the voodoo board may be down or network is broken. Ask the user to check.
+**If not reachable**, the testbot4 may be down or network is broken. Ask the user to check.
 
-### 2. Deploy binary to voodoo board
+### 2. Deploy binary to testbot4
 
-The device fetches firmware from the voodoo board's HTTP server (192.168.3.1 from device's perspective = 192.168.3.1 from host). Copy the built `.enc` file there:
+The device fetches firmware from the testbot4's HTTP server (192.168.7.100 from device's perspective = 192.168.7.100 from host). Copy the built `.enc` file there:
 
 ```bash
 ENC=$(ls -t output/lory-2k/images/deploy/binaries/*.enc | head -1)
-scp "$ENC" 192.168.3.1:/var/www/lory-2k/bin/
+scp "$ENC" 192.168.7.100:/var/www/lory-2k/bin/
 ```
 
-The fwupgrade URL is: `http://192.168.3.1/lory-2k/bin/$(basename $ENC)`
+The fwupgrade URL is: `http://192.168.7.100/lory-2k/bin/$(basename $ENC)`
 
 ### 3. Run the flash script
 
 ```bash
-python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/flash_lory.py "http://192.168.3.1/lory-2k/bin/$(basename $ENC)"
+python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/flash_lory.py "http://192.168.7.100/lory-2k/bin/$(basename $ENC)"
 ```
 
-The script connects to `192.168.3.1:9001` (serial_mux on voodoo board) and handles:
-- Waking the device (3x SYNC via voodoo board)
+The script connects to `192.168.7.100:9001` (serial_mux on testbot4) and handles:
+- Waking the device (3x SYNC via testbot4)
 - Login (root/arlo)
 - Waiting for network (iot0)
 - Pinging the update server
@@ -65,8 +65,8 @@ The script exits 0 on success, non-zero on failure. Report the confirmed firmwar
 
 | Error | Fix |
 |-------|-----|
-| serial_mux not reachable | Voodoo board at 192.168.3.1 may be down — ask user to check power/network |
-| Voodoo board unreachable | Check network to 192.168.3.1, verify board is powered |
+| serial_mux not reachable | Testbot4 at 192.168.7.100 may be down — ask user to check power/network |
+| Testbot4 unreachable | Check network to 192.168.7.100, verify board is powered |
 | No login prompt after wake | Device may need longer wake time, retry SYNC press |
 | iot0 never comes up | WiFi may not be configured, check if device is claimed |
 | Ping to server fails | Check host HTTP server is running, firewall rules |

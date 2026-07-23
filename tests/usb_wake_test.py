@@ -20,7 +20,7 @@ Usage:
 Prerequisites:
     - Device claimed, in Standby mode
     - serial_mux running (MCU on port 9002)
-    - Voodoo board reachable (DO6 = USB plug)
+    - testbot4 reachable (DO6 = USB plug)
 """
 
 import argparse
@@ -40,7 +40,7 @@ from lib.mcu_patterns import (
 
 sys.stdout.reconfigure(line_buffering=True)
 
-from voodoo.voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from testbot4.testbot4_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 ISP_BOOT_EXPECTED = [
     "Initramfs unpacking",
@@ -166,7 +166,7 @@ class USBWakeTest(DeviceTestBase):
     def _transition_a(self, state, cycle):
         if state == StateA.UNPLUG_USB:
             print("  [1] Unplug USB (DO6 OFF)")
-            self.voodoo_off(USB_DO_CHANNEL)
+            self.testbot4_off(USB_DO_CHANNEL)
             self.clear_events()
             self.mcu.start_recording()
             if self.isp:
@@ -221,7 +221,7 @@ class USBWakeTest(DeviceTestBase):
                 return StateA.FAIL_CRASH
             else:
                 print("    TIMEOUT — device didn't sleep")
-                self.voodoo_on(USB_DO_CHANNEL)
+                self.testbot4_on(USB_DO_CHANNEL)
                 return StateA.FAIL_TIMEOUT
 
         elif state == StateA.PLUG_USB:
@@ -232,7 +232,7 @@ class USBWakeTest(DeviceTestBase):
                 self.isp.clear_lines()
                 self.isp.start_recording()
             print("  [3] Plug USB (DO6 ON)")
-            self.voodoo_on(USB_DO_CHANNEL)
+            self.testbot4_on(USB_DO_CHANNEL)
             return StateA.OBSERVE
 
         elif state == StateA.OBSERVE:
@@ -277,7 +277,7 @@ class USBWakeTest(DeviceTestBase):
     def _transition_b(self, state, cycle):
         if state == StateB.ENSURE_AWAKE:
             print("  [1] Ensure USB plugged — device awake")
-            self.voodoo_on(USB_DO_CHANNEL)
+            self.testbot4_on(USB_DO_CHANNEL)
             self.clear_events()
             self.mcu.start_recording()
             if self.isp:
@@ -298,7 +298,7 @@ class USBWakeTest(DeviceTestBase):
                 self.isp.clear_lines()
                 self.isp.start_recording()
             print("  [2] Unplug USB — observing sleep flow...")
-            self.voodoo_off(USB_DO_CHANNEL)
+            self.testbot4_off(USB_DO_CHANNEL)
 
             result = self.wait_for_any_event(
                 {Event.ISP_OFF, Event.SLEEP_VOTE, Event.SLEEP, Event.CRASH},
@@ -331,7 +331,7 @@ class USBWakeTest(DeviceTestBase):
                 self.isp.clear_lines()
                 self.isp.start_recording()
             print("  [3] Replug USB — verifying ISP stays on or wakes...")
-            self.voodoo_on(USB_DO_CHANNEL)
+            self.testbot4_on(USB_DO_CHANNEL)
 
             result = self.wait_for_any_event(
                 {Event.ISP_WAKE, Event.CRASH}, timeout=60)
@@ -368,7 +368,7 @@ class USBWakeTest(DeviceTestBase):
                 self.isp.clear_lines()
                 self.isp.start_recording()
             print("  [5] Unplug USB — expecting full sleep within 60s...")
-            self.voodoo_off(USB_DO_CHANNEL)
+            self.testbot4_off(USB_DO_CHANNEL)
 
             result = self.wait_for_any_event(
                 {Event.SLEEP, Event.CRASH}, timeout=60)
@@ -438,7 +438,7 @@ class USBWakeTest(DeviceTestBase):
             else:
                 # Scenario A needs device asleep — unplug USB to exit ALWAYS_ON
                 print("  [RESET] Unplugging USB to allow sleep...")
-                self.voodoo_off(USB_DO_CHANNEL)
+                self.testbot4_off(USB_DO_CHANNEL)
                 time.sleep(2)
 
         print("  [RESET] Waiting for sleep (120s max)...")

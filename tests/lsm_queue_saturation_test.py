@@ -5,7 +5,7 @@ Two independent reproduction triggers are exercised:
 
   Phase A (Trigger A) — saturation during a concurrent live stream + motion.
     Drives rapid PIR triggers combined with ALS day/night oscillation via the
-    voodoo board while a user-initiated live stream is active. eRPC
+    testbot4 while a user-initiated live stream is active. eRPC
     post-processing to the MCU slows the LSM (Light Source Manager) event queue
     drain rate; simultaneous PIR + ALS switches overflow the fixed depth-25
     queue.
@@ -26,7 +26,7 @@ Prerequisites:
     - Device claimed, ISP awake
     - Night vision mode: Auto
     - serial_mux running (MCU on port 9002, ISP on port 9001)
-    - Voodoo board reachable
+    - testbot4 reachable
     - Phase A only: user must open a live stream from the Arlo app
 
 Usage:
@@ -50,7 +50,7 @@ from lib.mcu_patterns import (
     MCU_CRASH_PATTERNS, ISP_CRASH_PATTERNS,
     check_mcu_line, check_isp_line, AnomalyType,
 )
-from voodoo.voodoo_channels import DO_AMBLIGHT, DO_PIR
+from testbot4.testbot4_channels import DO_AMBLIGHT, DO_PIR
 
 
 class Event(Enum):
@@ -152,7 +152,7 @@ class LSMQueueSaturationTest(DeviceTestBase):
     def _set_night_and_wait(self):
         """Set night environment and wait for night mode confirmation."""
         print("  [2] Setting night environment (closing ALS shutter)...")
-        self.voodoo_on(DO_AMBLIGHT)
+        self.testbot4_on(DO_AMBLIGHT)
         time.sleep(1)
 
         print("  [2] Waiting for night mode (30s)...")
@@ -174,7 +174,7 @@ class LSMQueueSaturationTest(DeviceTestBase):
             time.sleep(0.5)
 
             # Flip to day
-            self.voodoo_off(DO_AMBLIGHT)
+            self.testbot4_off(DO_AMBLIGHT)
             time.sleep(0.8)
 
             # Another PIR trigger
@@ -182,7 +182,7 @@ class LSMQueueSaturationTest(DeviceTestBase):
             time.sleep(0.5)
 
             # Flip back to night
-            self.voodoo_on(DO_AMBLIGHT)
+            self.testbot4_on(DO_AMBLIGHT)
             time.sleep(0.8)
 
             # Check for crash mid-stress
@@ -295,7 +295,7 @@ class LSMQueueSaturationTest(DeviceTestBase):
 
         # Step 9: Cleanup
         print("  [6] Cleanup: restoring day environment...")
-        self.voodoo_off(DO_AMBLIGHT)
+        self.testbot4_off(DO_AMBLIGHT)
         time.sleep(10)
 
         return reproduced
@@ -440,10 +440,10 @@ class LSMQueueSaturationTest(DeviceTestBase):
         ref = time.time()
         osc_iterations = 5
         for i in range(osc_iterations):
-            self.voodoo_off(DO_AMBLIGHT)
+            self.testbot4_off(DO_AMBLIGHT)
             time.sleep(0.8)
             self._drain_phase_b_events(seen)
-            self.voodoo_on(DO_AMBLIGHT)
+            self.testbot4_on(DO_AMBLIGHT)
             time.sleep(0.8)
             self._drain_phase_b_events(seen)
             if seen["crash"]:
@@ -476,7 +476,7 @@ class LSMQueueSaturationTest(DeviceTestBase):
 
         # Step 8: Cleanup.
         print("  [7] Cleanup: restoring day environment...")
-        self.voodoo_off(DO_AMBLIGHT)
+        self.testbot4_off(DO_AMBLIGHT)
         time.sleep(10)
 
         return reproduced

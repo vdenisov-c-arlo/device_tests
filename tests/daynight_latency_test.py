@@ -2,7 +2,7 @@
 """
 Daynight shutter latency measurement test.
 
-Cycles the voodoo board ALS shutter (DO5) between day and night and measures
+Cycles the testbot4 ALS shutter (DO5) between day and night and measures
 the time from relay actuation to MCU detecting the ALS change and switching
 mode (logged as "DayNightStateSet(eMode=N)").
 
@@ -19,7 +19,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import DeviceTestBase
-from voodoo.voodoo_channels import DO_AMBLIGHT
+from testbot4.testbot4_channels import DO_AMBLIGHT
 from lib.mcu_patterns import MCU_CRASH_PATTERNS, AnomalyType
 
 
@@ -37,9 +37,9 @@ class DaynightLatencyTest(DeviceTestBase):
         super().__init__()
         self.switch_time = None
 
-    def voodoo_read_do(self):
+    def testbot4_read_do(self):
         """Read current DO register value. Returns int or None on failure."""
-        return self.voodoo_read()
+        return self.testbot4_read()
 
     def _check_events(self, line, source):
         if source != "MCU":
@@ -68,9 +68,9 @@ class DaynightLatencyTest(DeviceTestBase):
         self.clear_events()
 
         # Read current shutter state and ensure DAY
-        do_reg = self.voodoo_read_do()
+        do_reg = self.testbot4_read_do()
         if do_reg is None:
-            print("[ERROR] Cannot read voodoo DO register")
+            print("[ERROR] Cannot read testbot4 DO register")
             self.disconnect_consoles()
             return 1
         shutter_is_night = bool(do_reg & (1 << DO_AMBLIGHT))
@@ -78,7 +78,7 @@ class DaynightLatencyTest(DeviceTestBase):
               f"shutter is {'NIGHT (closed)' if shutter_is_night else 'DAY (open)'}")
         if shutter_is_night:
             print("[INIT] Switching to DAY (DO5 OFF)...")
-            self.voodoo_off(DO_AMBLIGHT)
+            self.testbot4_off(DO_AMBLIGHT)
             time.sleep(settle_time)
         else:
             print("[INIT] Already in DAY, good.")
@@ -100,7 +100,7 @@ class DaynightLatencyTest(DeviceTestBase):
             # Transition: DAY -> NIGHT
             self.clear_events()
             print("  [DAY->NIGHT] Closing shutter (DO5 ON)...")
-            self.voodoo_on(DO_AMBLIGHT)
+            self.testbot4_on(DO_AMBLIGHT)
             t_switch = time.time()
 
             evt = self.wait_for_event(EVT_MCU_NIGHT, self._mode_timeout)
@@ -118,7 +118,7 @@ class DaynightLatencyTest(DeviceTestBase):
             # Transition: NIGHT -> DAY
             self.clear_events()
             print("  [NIGHT->DAY] Opening shutter (DO5 OFF)...")
-            self.voodoo_off(DO_AMBLIGHT)
+            self.testbot4_off(DO_AMBLIGHT)
             t_switch = time.time()
 
             evt = self.wait_for_event(EVT_MCU_DAY, self._mode_timeout)

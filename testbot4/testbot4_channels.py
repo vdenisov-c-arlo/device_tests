@@ -1,6 +1,6 @@
-"""Voodoo board digital output channel definitions.
+"""Testbot4 digital output channel definitions.
 
-All scripts that reference voodoo DO channels should import from here.
+All scripts that reference testbot4 DO channels should import from here.
 """
 
 DO_SYNC = 0       # SYNC button (wake device from sleep)

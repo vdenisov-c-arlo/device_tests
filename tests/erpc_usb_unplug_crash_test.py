@@ -22,7 +22,7 @@ Usage:
 Prerequisites:
     - Device claimed, in always-on mode (100% or battery >95% with USB)
     - serial_mux running (MCU 9002, ISP 9001)
-    - Voodoo board reachable (DO6 = USB plug)
+    - testbot4 reachable (DO6 = USB plug)
 """
 
 import argparse
@@ -41,7 +41,7 @@ from lib.mcu_patterns import (
 
 sys.stdout.reconfigure(line_buffering=True)
 
-from voodoo.voodoo_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from testbot4.testbot4_channels import DO_USB as USB_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 CRASH_TARGET_PATTERNS = [
     "Core dump:",
@@ -165,7 +165,7 @@ class ErpcUsbUnplugCrashTest(DeviceTestBase):
     def _transition(self, state, cycle):
         if state == State.ENSURE_PLUGGED:
             print("  [1] Ensure USB plugged (DO6 ON)")
-            self.voodoo_on(USB_DO_CHANNEL)
+            self.testbot4_on(USB_DO_CHANNEL)
             self.clear_events()
             self.mcu.start_recording()
             if self.isp:
@@ -230,7 +230,7 @@ class ErpcUsbUnplugCrashTest(DeviceTestBase):
                 self.isp.start_recording()
 
             print("  [4] Unplug USB (DO6 OFF)")
-            self.voodoo_off(USB_DO_CHANNEL)
+            self.testbot4_off(USB_DO_CHANNEL)
             return State.OBSERVE_CRASH
 
         elif state == State.OBSERVE_CRASH:
@@ -276,7 +276,7 @@ class ErpcUsbUnplugCrashTest(DeviceTestBase):
             self.clear_events()
             self.mcu.clear_lines()
             self.mcu.start_recording()
-            self.voodoo_on(USB_DO_CHANNEL)
+            self.testbot4_on(USB_DO_CHANNEL)
             return State.WAIT_RECOVERY
 
         elif state == State.WAIT_RECOVERY:
@@ -336,7 +336,7 @@ class ErpcUsbUnplugCrashTest(DeviceTestBase):
         self.mcu.start_recording()
 
         # Ensure USB is plugged for always-on mode
-        self.voodoo_on(USB_DO_CHANNEL)
+        self.testbot4_on(USB_DO_CHANNEL)
         print("  [RESET] USB plugged, waiting for ISP ready (90s)...")
         result = self.wait_for_any_event(
             {Event.ISP_READY, Event.CRASH}, timeout=90)

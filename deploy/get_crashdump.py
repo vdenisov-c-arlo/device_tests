@@ -26,7 +26,7 @@ SERIAL_MUX_INI = os.path.join(SCRIPT_DIR, '..', 'serial_mux', 'serial_mux.ini')
 CORES_PATH = '/data/cores'
 MAX_WAKE_ATTEMPTS = 5
 
-from voodoo.voodoo_do_pulse import VoodooBoard
+from testbot4.testbot4_do_pulse import Testbot4
 
 
 def read_config():
@@ -49,7 +49,7 @@ def ping(host):
 
 def wake_device():
     print('  Pressing SYNC button...')
-    with VoodooBoard() as vb:
+    with Testbot4() as vb:
         vb.pulse(0, duration=2.0)
     time.sleep(10)
 

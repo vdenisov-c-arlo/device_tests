@@ -57,7 +57,7 @@ DUT_PASS=$(grep -A5 '^\[ssh\]' $ARLO_CLAUDE_SETTINGS/utils/custom/serial_mux/dut
 
 Same as `getlogs-lory`:
 1. `ping -c 1 -W 2 $DUT_HOST`
-2. If unreachable, wake via SYNC button (`python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/voodoo_do_pulse.py 0 2`), wait 10s, retry up to 5 times
+2. If unreachable, wake via SYNC button (`python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/testbot4_do_pulse.py 0 2`), wait 10s, retry up to 5 times
 3. If still unreachable, try serial IP discovery
 4. If all fails, report failure and stop
 

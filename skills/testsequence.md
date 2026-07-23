@@ -57,7 +57,7 @@ When the user wants to define, save, or run a repeatable test sequence on the de
 
 3. **On user selection**, read the sequence file and execute the steps interactively:
    - For device commands: use serial_mux (ISP port 9001, MCU port 9002)
-   - For button presses: use voodoo_do_pulse.py
+   - For button presses: use testbot4_do_pulse.py
    - For log monitoring: connect to appropriate serial port and watch for patterns
    - For timing: use appropriate delays
    - Report PASS/FAIL based on criteria in the sequence file.
@@ -67,7 +67,7 @@ When the user wants to define, save, or run a repeatable test sequence on the de
 - Always connect to serial_mux ports via TCP (`localhost:9001` for ISP, `localhost:9002` for MCU)
 - **Connect and start recording logs BEFORE triggering any action** (button press, reset, etc.) — crashdumps and early boot messages are lost if you connect after the event
 - Save logs for every cycle (pass or fail) so post-mortem analysis is always possible
-- Use `/home/denisov/arlo/claude_settings/utils/custom/device_tests/voodoo_do_pulse.py` for button presses
+- Use `/home/denisov/arlo/claude_settings/utils/custom/device_tests/testbot4_do_pulse.py` for button presses
 - When monitoring logs, use a timeout to avoid hanging forever
 - Print real-time output so the user can see what's happening
 - At the end, clearly state PASS or FAIL with evidence
@@ -77,6 +77,6 @@ When the user wants to define, save, or run a repeatable test sequence on the de
 | Error | Fix |
 |-------|-----|
 | serial_mux not running | Ask user to start it |
-| Voodoo unreachable | Report and abort |
+| Testbot4 unreachable | Report and abort |
 | Timeout waiting for expected log | Report FAIL with what was seen |
 | Device unresponsive | Try wake via SYNC, if still dead report FAIL |

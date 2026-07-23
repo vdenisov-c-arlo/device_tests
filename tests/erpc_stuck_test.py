@@ -34,7 +34,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 NUM_CYCLES = int(sys.argv[1]) if len(sys.argv) > 1 else 20
 
-from voodoo.voodoo_channels import DO_SYNC as SYNC_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
+from testbot4.testbot4_channels import DO_SYNC as SYNC_DO_CHANNEL, DO_RESET as RESET_DO_CHANNEL
 
 ERPC_STANDBY_PATTERN = "eRPC from DOWN to STANDBY"
 ERPC_DOWN_PATTERN = "pga_sm_set_rpc_down"

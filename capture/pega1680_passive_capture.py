@@ -75,7 +75,7 @@ class PassiveCapture:
         self.isp.start()
         print("  [OK] ISP connected")
 
-        print("[2/2] Connecting MCU (192.168.3.1:9002)...")
+        print("[2/2] Connecting MCU (192.168.7.100:9002)...")
         self.mcu = SerialMuxReader(
             "MCU", self.cfg['mcu_host'], self.cfg['mcu_port'],
             event_callback=self._mcu_cb)

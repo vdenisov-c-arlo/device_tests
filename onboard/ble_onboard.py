@@ -54,7 +54,7 @@ from onboard.ble_onboard_crypto import (
 )
 from onboard.ble_onboard_serial import SerialMuxClient, disable_fota
 from onboard.ble_onboard_cloud import ArloCloudClient
-from voodoo.voodoo_do_pulse import connect as voodoo_connect, write_do, read_do
+from testbot4.testbot4_do_pulse import connect as testbot4_connect, write_do, read_do
 
 SYNC_BUTTON_DO = 0
 sys.stdout.reconfigure(line_buffering=True)
@@ -91,7 +91,7 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Steps (run in order, or pick individual ones):
-  wake       Wake from shipping mode (long + short SYNC presses via Voodoo)
+  wake       Wake from shipping mode (long + short SYNC presses via testbot4)
   fota       Disable FOTA URL via serial_mux (prevents firmware update during test)
   scan       BLE scan by name, connect, read cert_id and FW version
   pubkey     Fetch device public key from Arlo cloud (needs cert_id from scan)
@@ -252,10 +252,10 @@ class BleOnboarder:
     # ------------------------------------------------------------------
 
     def step_wake(self):
-        """Wake device from shipping mode via Voodoo SYNC button."""
+        """Wake device from shipping mode via testbot4 SYNC button."""
         print("\n=== STEP: wake ===")
-        from voodoo.voodoo_do_pulse import MODBUS_TCP_PORT, DEFAULT_HOST
-        sock = voodoo_connect(DEFAULT_HOST, MODBUS_TCP_PORT)
+        from testbot4.testbot4_do_pulse import MODBUS_TCP_PORT, DEFAULT_HOST
+        sock = testbot4_connect(DEFAULT_HOST, MODBUS_TCP_PORT)
         try:
             print("  Long SYNC press (15s) — wake from shipping...")
             cur = read_do(sock, 1)

@@ -4,7 +4,7 @@ PEGA-1680: IR cut day/night transition test during active stream.
 
 Prerequisites:
 - Device streaming (live view active from app, or D2AP mode)
-- Voodoo board accessible
+- testbot4 accessible
 - serial_mux running
 
 Test:
@@ -23,7 +23,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from lib.console_utils import DeviceTestBase
-from voodoo.voodoo_channels import DO_AMBLIGHT
+from testbot4.testbot4_channels import DO_AMBLIGHT
 
 # Events fired by _check_events
 EVT_MCU_NIGHT = "mcu_night"
@@ -122,7 +122,7 @@ class PEGA1680Test(DeviceTestBase):
 
         # Step 1: Force NIGHT
         print("[1] Forcing NIGHT (DO5 ON, shutter closed)...")
-        if not self.voodoo_on(DO_AMBLIGHT):
+        if not self.testbot4_on(DO_AMBLIGHT):
             print("  [ERROR] Failed to set DO5 ON")
             return False
 
@@ -153,7 +153,7 @@ class PEGA1680Test(DeviceTestBase):
         # Step 2: Force DAY
         print("\n[2] Forcing DAY (DO5 OFF, shutter open)...")
         self.clear_events()
-        if not self.voodoo_off(DO_AMBLIGHT):
+        if not self.testbot4_off(DO_AMBLIGHT):
             print("  [ERROR] Failed to set DO5 OFF")
             return False
 

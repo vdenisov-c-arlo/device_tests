@@ -165,7 +165,7 @@ class StreamDebugCapture:
     def setup(self):
         os.makedirs(LOG_DIR, exist_ok=True)
 
-        print("[1/3] Connecting ISP console (192.168.3.1:9001)...")
+        print("[1/3] Connecting ISP console (192.168.7.100:9001)...")
         self.isp = SerialMuxReader(
             "ISP", self.cfg['isp_host'], self.cfg['isp_port'],
             event_callback=self._isp_callback)
@@ -175,7 +175,7 @@ class StreamDebugCapture:
         time.sleep(2)
         print("  [OK] ISP connected, tail -f running")
 
-        print("[2/3] Connecting MCU console (192.168.3.1:9002)...")
+        print("[2/3] Connecting MCU console (192.168.7.100:9002)...")
         self.mcu = SerialMuxReader(
             "MCU", self.cfg['mcu_host'], self.cfg['mcu_port'],
             event_callback=self._mcu_callback)

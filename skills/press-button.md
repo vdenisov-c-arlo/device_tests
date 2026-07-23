@@ -1,6 +1,6 @@
 ---
 name: press-button
-description: Press a button on the device via the voodoo board's digital outputs. Supports Sync, Front, Reset, and Program Mode buttons.
+description: Press a button on the device via testbot4's digital outputs. Supports Sync, Front, Reset, and Program Mode buttons.
 ---
 
 # Press Button
@@ -11,12 +11,12 @@ When you need to simulate a physical button press on the connected device — to
 
 ## Prerequisites
 
-- Voodoo board reachable at `192.168.3.1` (Modbus TCP, port 502).
-- Script: `$ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/voodoo_do_pulse.py`.
+- Testbot4 reachable at `192.168.7.100` (Modbus TCP, port 502).
+- Script: `$ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/testbot4_do_pulse.py`.
 
 ## Button Map
 
-Canonical definitions in `utils/custom/device_tests/voodoo_channels.py`.
+Canonical definitions in `utils/custom/device_tests/testbot4/testbot4_channels.py`.
 
 | DO# | Constant | Button | Typical Use |
 |-----|----------|--------|-------------|
@@ -53,54 +53,54 @@ For the Sync button (DO0), you MUST verify the press was received by checking th
 **Procedure:**
 
 1. Note the current MCU log line count: `wc -l /tmp/serial_logs/mcu_*.log`
-2. Send a short initial pulse (0.5s): `python3 utils/custom/device_tests/voodoo_do_pulse.py 0 0.5`
+2. Send a short initial pulse (0.5s): `python3 utils/custom/device_tests/testbot4_do_pulse.py 0 0.5`
 3. Wait 500ms, then check new MCU log lines for `[BUTTON]` or `pegaERPC_NotifyButtonState`:
    ```bash
    tail -n +<prev_count> /tmp/serial_logs/mcu_<latest>.log | grep -a "BUTTON"
    ```
 4. **If no BUTTON event appears:** release (already released), wait 500ms, and retry.
 5. **Repeat up to 5 attempts.** If all 5 fail, escalate to the user — the device may be unresponsive or disconnected.
-6. **Once a BUTTON event is confirmed:** if a longer hold is needed (e.g., 15s for factory reset), immediately send the full-duration pulse: `python3 utils/custom/device_tests/voodoo_do_pulse.py 0 <DURATION>`
+6. **Once a BUTTON event is confirmed:** if a longer hold is needed (e.g., 15s for factory reset), immediately send the full-duration pulse: `python3 utils/custom/device_tests/testbot4_do_pulse.py 0 <DURATION>`
 
 For non-Sync buttons (DO1-DO3), verification is optional — just execute the pulse directly.
 
-**Script location:** `utils/custom/device_tests/voodoo_do_pulse.py` (relative to cambuildroot root)
+**Script location:** `utils/custom/device_tests/testbot4_do_pulse.py` (relative to cambuildroot root)
 
 **Pulse mode** (turn on, wait, turn off):
 ```bash
-python3 utils/custom/device_tests/voodoo_do_pulse.py 0 2    # Sync button, 2 seconds (wake)
-python3 utils/custom/device_tests/voodoo_do_pulse.py 1 1    # Front button, 1 second (ring)
-python3 utils/custom/device_tests/voodoo_do_pulse.py 2 1    # Reset button, 1 second (HW reset)
-python3 utils/custom/device_tests/voodoo_do_pulse.py 3 1    # Program mode button, 1 second
-python3 utils/custom/device_tests/voodoo_do_pulse.py 7 3    # PIR trigger, 3 seconds
+python3 utils/custom/device_tests/testbot4_do_pulse.py 0 2    # Sync button, 2 seconds (wake)
+python3 utils/custom/device_tests/testbot4_do_pulse.py 1 1    # Front button, 1 second (ring)
+python3 utils/custom/device_tests/testbot4_do_pulse.py 2 1    # Reset button, 1 second (HW reset)
+python3 utils/custom/device_tests/testbot4_do_pulse.py 3 1    # Program mode button, 1 second
+python3 utils/custom/device_tests/testbot4_do_pulse.py 7 3    # PIR trigger, 3 seconds
 ```
 
 **Set on/off indefinitely** (for USB plug, or holding a button):
 ```bash
-python3 utils/custom/device_tests/voodoo_do_pulse.py --on 6     # USB plugged (DO6 ON, stays on)
-python3 utils/custom/device_tests/voodoo_do_pulse.py --off 6    # USB unplugged (DO6 OFF)
-python3 utils/custom/device_tests/voodoo_do_pulse.py --on 0     # Hold sync button indefinitely
-python3 utils/custom/device_tests/voodoo_do_pulse.py --off 0    # Release sync button
+python3 utils/custom/device_tests/testbot4_do_pulse.py --on 6     # USB plugged (DO6 ON, stays on)
+python3 utils/custom/device_tests/testbot4_do_pulse.py --off 6    # USB unplugged (DO6 OFF)
+python3 utils/custom/device_tests/testbot4_do_pulse.py --on 0     # Hold sync button indefinitely
+python3 utils/custom/device_tests/testbot4_do_pulse.py --off 0    # Release sync button
 ```
 
 **Read current state:**
 ```bash
-python3 utils/custom/device_tests/voodoo_do_pulse.py --read     # Shows which DOs are currently ON
+python3 utils/custom/device_tests/testbot4_do_pulse.py --read     # Shows which DOs are currently ON
 ```
 
 Note: `--on`/`--off` use read-modify-write so they don't disturb other active DOs.
 
 ### 3. Report result
 
-Confirm which button was pressed and for how long. If the script errors (e.g., voodoo board unreachable), report the connection failure.
+Confirm which button was pressed and for how long. If the script errors (e.g., testbot4 unreachable), report the connection failure.
 
 ## Error Handling
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Connection refused` | Voodoo board not powered or wrong IP | Check power and network to 192.168.3.1 |
-| `timed out` | Network path blocked | Check that host can reach 192.168.3.1 |
-| `Modbus exception` | Invalid DO register or board firmware issue | Verify board is a voodoo board with DO support |
+| `Connection refused` | Testbot4 not powered or wrong IP | Check power and network to 192.168.7.100 |
+| `timed out` | Network path blocked | Check that host can reach 192.168.7.100 |
+| `Modbus exception` | Invalid DO register or board firmware issue | Verify board is a testbot4 with DO support |
 
 ## Arguments
 

@@ -3,7 +3,7 @@
 
 Requires serial_terminals.sh to be running (serial_mux on port 9001).
 
-Wakes the device via voodoo board SYNC button, logs in to ISP console,
+Wakes the device via testbot4 SYNC button, logs in to ISP console,
 waits for network, issues fwupgrade, monitors progress, and verifies.
 
 Usage:
@@ -33,7 +33,7 @@ SERVER_IP = _cfg.get('server', 'host_ip', fallback='192.168.100.75')
 
 IMAGES_DIR = os.path.join(os.getcwd(), 'output', 'lory-2k', 'images')
 
-from voodoo.voodoo_do_pulse import VoodooBoard
+from testbot4.testbot4_do_pulse import Testbot4
 
 
 class SocketSerial:
@@ -167,7 +167,7 @@ def get_fwupgrade_url():
 
 def wake_device():
     print('=== Waking device (3x SYNC button press) ===')
-    with VoodooBoard() as vb:
+    with Testbot4() as vb:
         for i in range(3):
             vb.pulse(0, duration=1.0)
             print(f'  press {i+1}: done')

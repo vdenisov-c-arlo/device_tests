@@ -48,7 +48,7 @@ ping -c 1 -W 2 $DUT_HOST >/dev/null 2>&1 && echo "DUT reachable" || echo "DUT un
 
 **If unreachable**, attempt to wake the device:
 
-1. Press SYNC button via voodoo board: `python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/voodoo_do_pulse.py 0 2`
+1. Press SYNC button via testbot4: `python3 $ARLO_CLAUDE_SETTINGS/utils/custom/device_tests/testbot4_do_pulse.py 0 2`
 2. Wait 10 seconds
 3. Retry ping
 4. Repeat up to **5 times**

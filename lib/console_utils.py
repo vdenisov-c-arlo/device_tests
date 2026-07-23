@@ -23,17 +23,17 @@ _INI_PATH = os.environ.get(
 
 
 def get_serial_mux_config():
-    """Read serial_mux.ini and return a dict with ISP/MCU/voodoo connection settings."""
+    """Read serial_mux.ini and return a dict with ISP/MCU/testbot4 connection settings."""
     cfg = configparser.ConfigParser()
     cfg.read(_INI_PATH)
     return {
-        'isp_host': cfg.get('isp', 'tcp_host', fallback='192.168.3.1'),
+        'isp_host': cfg.get('isp', 'tcp_host', fallback='192.168.7.100'),
         'isp_port': cfg.getint('isp', 'tcp_port', fallback=9001),
-        'mcu_host': cfg.get('mcu', 'tcp_host', fallback='192.168.3.1'),
+        'mcu_host': cfg.get('mcu', 'tcp_host', fallback='192.168.7.100'),
         'mcu_port': cfg.getint('mcu', 'tcp_port', fallback=9002),
-        'voodoo_host': cfg.get('voodoo', 'host', fallback='192.168.3.1'),
-        'voodoo_port': cfg.getint('voodoo', 'modbus_port', fallback=502),
-        'server_ip': cfg.get('server', 'host_ip', fallback='192.168.3.1'),
+        'testbot4_host': cfg.get('testbot4', 'host', fallback='192.168.7.100'),
+        'testbot4_port': cfg.getint('testbot4', 'modbus_port', fallback=502),
+        'server_ip': cfg.get('server', 'host_ip', fallback='192.168.7.100'),
     }
 
 
@@ -336,7 +336,7 @@ class DeviceTestBase:
     Provides:
       - MCU/ISP reader management (connect, disconnect, reconnect)
       - Event queue with wait/check/clear operations
-      - Voodoo board button/DO control with retry
+      - Testbot4 button/DO control with retry
       - ISP console initialization
       - MCU sleep verification
       - Log saving
@@ -363,14 +363,14 @@ class DeviceTestBase:
         self.event_signal = threading.Event()
         self.results = []
         self._cfg = get_serial_mux_config()
-        self._voodoo = None
+        self._testbot4 = None
 
-    def _get_voodoo(self):
-        if self._voodoo is None:
-            from voodoo.voodoo_do_pulse import VoodooBoard
-            self._voodoo = VoodooBoard()
-            self._voodoo.connect()
-        return self._voodoo
+    def _get_testbot4(self):
+        if self._testbot4 is None:
+            from testbot4.testbot4_do_pulse import Testbot4
+            self._testbot4 = Testbot4()
+            self._testbot4.connect()
+        return self._testbot4
 
     # --- Event queue ---
 
@@ -456,9 +456,9 @@ class DeviceTestBase:
             self.mcu.disconnect()
         if self.isp:
             self.isp.disconnect()
-        if self._voodoo:
-            self._voodoo.disconnect()
-            self._voodoo = None
+        if self._testbot4:
+            self._testbot4.disconnect()
+            self._testbot4 = None
 
     def reconnect_consoles(self):
         """Disconnect and reconnect both readers (creates new threads)."""
@@ -513,60 +513,60 @@ class DeviceTestBase:
         except OSError:
             return False
 
-    # --- Voodoo board control ---
+    # --- Testbot4 control ---
 
     def press_button(self, channel, duration=0.3, retries=3):
-        """Pulse voodoo DO channel. Returns True on success."""
+        """Pulse testbot4 DO channel. Returns True on success."""
         for attempt in range(retries):
             try:
-                self._get_voodoo().pulse(channel, duration)
+                self._get_testbot4().pulse(channel, duration)
                 return True
             except (OSError, RuntimeError) as e:
-                print(f"  [WARN] voodoo attempt {attempt+1}/{retries} failed: {e}")
-                self._voodoo = None
+                print(f"  [WARN] testbot4 attempt {attempt+1}/{retries} failed: {e}")
+                self._testbot4 = None
             time.sleep(1)
-        print(f"  [ERROR] voodoo pulse DO{channel} failed after {retries} retries")
+        print(f"  [ERROR] testbot4 pulse DO{channel} failed after {retries} retries")
         return False
 
-    def voodoo_on(self, channel):
-        """Turn voodoo DO on indefinitely."""
+    def testbot4_on(self, channel):
+        """Turn testbot4 DO on indefinitely."""
         try:
-            self._get_voodoo().on(channel)
+            self._get_testbot4().on(channel)
             return True
         except (OSError, RuntimeError) as e:
-            print(f"  [ERROR] voodoo on DO{channel}: {e}", file=sys.stderr)
-            self._voodoo = None
+            print(f"  [ERROR] testbot4 on DO{channel}: {e}", file=sys.stderr)
+            self._testbot4 = None
             return False
 
-    def voodoo_off(self, channel):
-        """Turn voodoo DO off."""
+    def testbot4_off(self, channel):
+        """Turn testbot4 DO off."""
         try:
-            self._get_voodoo().off(channel)
+            self._get_testbot4().off(channel)
             return True
         except (OSError, RuntimeError) as e:
-            print(f"  [ERROR] voodoo off DO{channel}: {e}", file=sys.stderr)
-            self._voodoo = None
+            print(f"  [ERROR] testbot4 off DO{channel}: {e}", file=sys.stderr)
+            self._testbot4 = None
             return False
 
-    def voodoo_on_pair(self, channel_a, channel_b):
-        """Turn two voodoo DOs on together."""
-        ok_a = self.voodoo_on(channel_a)
-        ok_b = self.voodoo_on(channel_b)
+    def testbot4_on_pair(self, channel_a, channel_b):
+        """Turn two testbot4 DOs on together."""
+        ok_a = self.testbot4_on(channel_a)
+        ok_b = self.testbot4_on(channel_b)
         return ok_a and ok_b
 
-    def voodoo_off_pair(self, channel_a, channel_b):
-        """Turn two voodoo DOs off together."""
-        ok_a = self.voodoo_off(channel_a)
-        ok_b = self.voodoo_off(channel_b)
+    def testbot4_off_pair(self, channel_a, channel_b):
+        """Turn two testbot4 DOs off together."""
+        ok_a = self.testbot4_off(channel_a)
+        ok_b = self.testbot4_off(channel_b)
         return ok_a and ok_b
 
-    def voodoo_read(self):
+    def testbot4_read(self):
         """Read current DO register state. Returns int or None."""
         try:
-            return self._get_voodoo().read()
+            return self._get_testbot4().read()
         except (OSError, RuntimeError) as e:
-            print(f"  [ERROR] voodoo read: {e}", file=sys.stderr)
-            self._voodoo = None
+            print(f"  [ERROR] testbot4 read: {e}", file=sys.stderr)
+            self._testbot4 = None
             return None
 
     # --- Log saving ---

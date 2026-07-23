@@ -15,10 +15,10 @@ _ini.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'serial
 
 SLAVE_ADDR = 0xFF
 DO_REG = 1
-MODBUS_TCP_PORT = _ini.getint('voodoo', 'modbus_port', fallback=502)
-DEFAULT_HOST = _ini.get('voodoo', 'host', fallback='192.168.3.1')
+MODBUS_TCP_PORT = _ini.getint('testbot4', 'modbus_port', fallback=502)
+DEFAULT_HOST = _ini.get('testbot4', 'host', fallback='192.168.7.100')
 
-from voodoo.voodoo_channels import DO_PROGRAM, DO_RESET
+from testbot4.testbot4_channels import DO_PROGRAM, DO_RESET
 DO_PROGRAM_MASK = 1 << DO_PROGRAM  # 0x08
 DO_RESET_MASK = 1 << DO_RESET      # 0x04
 
