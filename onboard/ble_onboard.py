@@ -5,7 +5,7 @@ Each step can be run individually or all steps run sequentially.
 State is persisted to a JSON file between steps so you can debug step-by-step.
 
 Steps:
-  wake       Wake device from shipping mode (15s long press + 5x short presses)
+  wake       Wake device from shipping mode (10s long press + 3x 3s short presses)
   fota       Disable FOTA update URL via serial console
   scan       BLE scan, connect, and read device info (cert_id, fw version)
   pubkey     Fetch device EC public key from Arlo cloud using cert_id
@@ -91,7 +91,7 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Steps (run in order, or pick individual ones):
-  wake       Wake from shipping mode (long + short SYNC presses via testbot4)
+  wake       Wake from shipping mode (10s + 3x3s SYNC presses via testbot4)
   fota       Disable FOTA URL via serial_mux (prevents firmware update during test)
   scan       BLE scan by name, connect, read cert_id and FW version
   pubkey     Fetch device public key from Arlo cloud (needs cert_id from scan)
@@ -251,41 +251,96 @@ class BleOnboarder:
     # Steps
     # ------------------------------------------------------------------
 
+    def _sync_press(self, sock, duration):
+        """Single SYNC button press via Modbus."""
+        cur = read_do(sock, 1)
+        on_val = cur | (1 << SYNC_BUTTON_DO)
+        write_do(sock, on_val, 2)
+        time.sleep(duration)
+        off_val = on_val & ~(1 << SYNC_BUTTON_DO)
+        write_do(sock, off_val, 3)
+
+    def _sync_short_presses(self, sock, count=3, duration=3, gap=2):
+        """Multiple short SYNC presses."""
+        for i in range(count):
+            cur = read_do(sock, 1)
+            on_val = cur | (1 << SYNC_BUTTON_DO)
+            write_do(sock, on_val, 10 + i * 2)
+            time.sleep(duration)
+            off_val = on_val & ~(1 << SYNC_BUTTON_DO)
+            write_do(sock, off_val, 11 + i * 2)
+            print(f"    Press {i+1}/{count} done")
+            if i < count - 1:
+                time.sleep(gap)
+
+    def _monitor_tcp(self, host, port, timeout_s, patterns):
+        """Read from a TCP serial_mux port, return first line matching any pattern."""
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout_s)
+        try:
+            s.connect((host, port))
+            buf = b''
+            deadline = time.time() + timeout_s
+            while time.time() < deadline:
+                try:
+                    s.settimeout(max(0.5, deadline - time.time()))
+                    data = s.recv(4096)
+                    if not data:
+                        break
+                    buf += data
+                    text = buf.decode('utf-8', errors='replace')
+                    for line in text.splitlines():
+                        for pat in patterns:
+                            if pat in line:
+                                return pat, line
+                except socket.timeout:
+                    continue
+        except (OSError, socket.timeout):
+            pass
+        finally:
+            s.close()
+        return None, None
+
     def step_wake(self):
-        """Wake device from shipping mode via testbot4 SYNC button."""
+        """Wake device from shipping mode via testbot4 SYNC button.
+
+        Full sequence (shipping mode):
+        1. Long press (10s) to exit shipping mode
+        2. Wait for MCU to boot
+        3. Wait 5s for MCU to settle
+        4. 3x short presses (3s each) to enter BLE pairing
+
+        With --no-wake (device already awake):
+        - Skip steps 1-3, just do the short presses for BLE advertising
+        """
         print("\n=== STEP: wake ===")
         from testbot4.testbot4_do_pulse import MODBUS_TCP_PORT, DEFAULT_HOST
         sock = testbot4_connect(DEFAULT_HOST, MODBUS_TCP_PORT)
         try:
-            print("  Long SYNC press (15s) — wake from shipping...")
-            cur = read_do(sock, 1)
-            on_val = cur | (1 << SYNC_BUTTON_DO)
-            write_do(sock, on_val, 2)
-            time.sleep(15)
-            off_val = on_val & ~(1 << SYNC_BUTTON_DO)
-            write_do(sock, off_val, 3)
-            print("  Released")
+            if not self.args.no_wake:
+                # Full wake from shipping mode
+                print("  Long SYNC press (10s) — wake from shipping...")
+                self._sync_press(sock, 10)
+                print("  Released")
 
-            print("  Waiting for MCU console (60s max)...")
-            mcu_port = 9002
-            serial = SerialMuxClient(self.serial_client_path, self.serial_host, mcu_port)
-            if serial.wait_for_output(timeout_s=60, poll_interval=2):
-                print("  MCU active")
+                print("  Waiting for MCU to boot (60s max)...")
+                mcu_port = 9002
+                serial = SerialMuxClient(self.serial_client_path, self.serial_host, mcu_port)
+                if serial.wait_for_output(timeout_s=60, poll_interval=2):
+                    print("  MCU active")
+                else:
+                    print("  WARNING: No MCU output after 60s, continuing")
+
+                print("  Waiting 5s for MCU to settle...")
+                time.sleep(5)
             else:
-                print("  WARNING: No MCU output after 60s, continuing")
+                print("  Device already awake, skipping long press")
 
-            print("  5x short SYNC presses (3s each)...")
-            time.sleep(2)
-            for i in range(5):
-                cur = read_do(sock, 1)
-                on_val = cur | (1 << SYNC_BUTTON_DO)
-                write_do(sock, on_val, 10 + i * 2)
-                time.sleep(3)
-                off_val = on_val & ~(1 << SYNC_BUTTON_DO)
-                write_do(sock, off_val, 11 + i * 2)
-                print(f"    Press {i+1}/5 done")
-                if i < 4:
-                    time.sleep(2)
+            # Short presses to enter BLE pairing mode
+            print("  3x short SYNC presses (3s each)...")
+            self._sync_short_presses(sock, count=3, duration=3, gap=2)
+
         finally:
             sock.close()
 
@@ -297,12 +352,7 @@ class BleOnboarder:
     def step_fota(self):
         """Disable FOTA update URL via serial console."""
         print("\n=== STEP: fota ===")
-        serial = SerialMuxClient(self.serial_client_path, self.serial_host, self.serial_port)
-        if not serial.check_connection():
-            print("  ERROR: serial_mux not reachable")
-            return False
-        result = disable_fota(serial)
-        print(f"  DONE (success={result})")
+        print("  SKIPPED (disabled for now)")
         return True
 
     async def step_scan(self):
@@ -750,10 +800,7 @@ def main():
     steps = []
     for s in args.steps:
         if s == "all":
-            if args.no_wake:
-                steps.extend(ALL_STEPS[1:])  # skip wake
-            else:
-                steps.extend(ALL_STEPS)
+            steps.extend(ALL_STEPS)
         else:
             steps.append(s)
 
